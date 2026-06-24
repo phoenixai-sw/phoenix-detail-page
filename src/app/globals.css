@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #f7f4ef;
-  --color-foreground: #161716;
+  --color-background: #f3f6f8;
+  --color-foreground: #101726;
   --color-card: #ffffff;
-  --color-card-foreground: #161716;
-  --color-muted: #eeebe4;
-  --color-muted-foreground: #706d66;
-  --color-border: #ddd5c8;
-  --color-ring: rgba(191, 139, 57, 0.32);
+  --color-card-foreground: #101726;
+  --color-muted: #e8eef3;
+  --color-muted-foreground: #667085;
+  --color-border: #d7e0e8;
+  --color-ring: rgba(255, 111, 97, 0.34);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
@@ -20,9 +20,10 @@
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(247,244,239,0.96)),
-    radial-gradient(circle at 0 0, rgba(191,139,57,0.12), transparent 28rem),
-    repeating-linear-gradient(90deg, rgba(22,23,22,0.024) 0 1px, transparent 1px 84px);
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(243,246,248,0.98)),
+    radial-gradient(circle at 0 0, rgba(255,111,97,0.14), transparent 30rem),
+    radial-gradient(circle at 100% 8%, rgba(45,212,191,0.14), transparent 26rem),
+    repeating-linear-gradient(90deg, rgba(16,23,38,0.024) 0 1px, transparent 1px 86px);
   color: var(--color-foreground);
   letter-spacing: 0;
 }

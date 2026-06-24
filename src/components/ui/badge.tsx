@@ -7,8 +7,8 @@ const badgeVariants = cva("inline-flex min-h-6 items-center rounded-full px-2.5 
     variant: {
       default: "bg-muted text-muted-foreground",
       dark: "bg-foreground text-background",
-      green: "bg-emerald-50 text-emerald-700",
-      blue: "bg-blue-50 text-blue-700"
+      green: "bg-[#e8fbf7] text-[#08796f]",
+      blue: "bg-[#eef4ff] text-[#2f5fb8]"
     }
   },
   defaultVariants: {

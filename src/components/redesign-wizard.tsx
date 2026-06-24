@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import {
@@ -695,7 +695,7 @@ export function RedesignWizard() {
           onClick={() => setView("dashboard")}
           aria-label="홈보드로 이동"
         >
-          <div className="grid size-9 place-items-center rounded-md bg-foreground text-xs font-black text-amber-200 shadow-sm">PD</div>
+          <div className="grid size-9 place-items-center rounded-md bg-foreground text-xs font-black text-[#ffd36a] shadow-sm">PD</div>
           <div>
             <strong className="block text-sm leading-tight">phoenix detail page</strong>
           </div>
@@ -710,7 +710,7 @@ export function RedesignWizard() {
               key={id}
               className={cn(
                 "flex h-10 items-center justify-between rounded-md px-3 text-left text-sm text-muted-foreground",
-                view === id && "bg-foreground text-background shadow-sm ring-1 ring-amber-200/50"
+                view === id && "bg-foreground text-background shadow-sm ring-1 ring-[#ffd36a]/50"
               )}
               onClick={() => setView(id as View)}
             >
@@ -841,7 +841,7 @@ export function RedesignWizard() {
                 registerKnowledgeFiles(Array.from(event.dataTransfer.files));
               }}
             >
-              <FileText className="size-5 text-emerald-600" />
+              <FileText className="size-5 text-[#0d9488]" />
               PDF, TXT, MD 레퍼런스 등록
             </button>
             <input
@@ -857,7 +857,7 @@ export function RedesignWizard() {
                 {knowledgeItems.map((item) => (
                   <div key={item.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-white p-2 text-xs">
                     <span className="min-w-0 truncate">
-                      <FileText className="mr-1 inline size-3 text-emerald-600" />
+                      <FileText className="mr-1 inline size-3 text-[#0d9488]" />
                       {item.name}
                       <span className="ml-2 text-muted-foreground">{item.text.length.toLocaleString()}자</span>
                       <Badge className="ml-2" variant={item.indexed ? "green" : "default"}>
@@ -1445,7 +1445,7 @@ function Dashboard({
               projects.map((project) => (
                 <div
                   key={project.id}
-                  className="grid grid-cols-[52px_minmax(0,1fr)_40px] items-center gap-3 rounded-md border border-border bg-white p-3 transition hover:border-emerald-200 hover:bg-emerald-50/30"
+                  className="grid grid-cols-[52px_minmax(0,1fr)_40px] items-center gap-3 rounded-md border border-border bg-white p-3 transition hover:border-[#ffd3c8] hover:bg-[#fff3ee]"
                 >
                   <button
                     type="button"
@@ -1599,7 +1599,7 @@ function Workspace(props: {
             </CardHeader>
             <CardContent>
               <button
-                className="grid min-h-64 w-full place-items-center rounded-md border border-dashed border-emerald-300 bg-white/60 p-6 text-center"
+                className="grid min-h-64 w-full place-items-center rounded-md border border-dashed border-[#ff9f7a] bg-white/60 p-6 text-center"
                 onClick={() => inputRef.current?.click()}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => {
@@ -1608,7 +1608,7 @@ function Workspace(props: {
                 }}
               >
                 <span>
-                  <span className="mx-auto mb-3 grid size-14 place-items-center rounded-md border border-border bg-white text-emerald-600">
+                  <span className="mx-auto mb-3 grid size-14 place-items-center rounded-md border border-border bg-white text-[#0d9488]">
                     <Upload className="size-7" />
                   </span>
                   <strong>이미지 또는 PDF를 여기에 추가</strong>
@@ -1697,7 +1697,7 @@ function Workspace(props: {
               {(["openai", "google"] as const).map((model) => (
                 <button
                   key={model}
-                  className={cn("rounded-md border border-border bg-white p-3 text-left", selectedModel === model && "border-emerald-400 ring-4 ring-emerald-100")}
+                  className={cn("rounded-md border border-border bg-white p-3 text-left", selectedModel === model && "border-[#ff6f61] ring-4 ring-[#ffe0d8]")}
                   onClick={() => setSelectedModel(model)}
                 >
                   <strong className="block text-sm">{models[model].label}</strong>
@@ -1750,7 +1750,7 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
         <label className="block text-xs font-bold text-muted-foreground">사용처 선택</label>
         <button
           type="button"
-          className="grid size-6 place-items-center rounded-full border border-border bg-white text-muted-foreground transition hover:border-emerald-300 hover:text-emerald-700"
+          className="grid size-6 place-items-center rounded-full border border-border bg-white text-muted-foreground transition hover:border-[#ff9f7a] hover:text-[#e4574f]"
           onClick={() => setOpen(true)}
           aria-label="사용처 설명 보기"
         >
@@ -1778,7 +1778,7 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
-            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
+            <div className="rounded-md border border-[#ffd3c8] bg-[#fff3ee] p-3 text-sm leading-relaxed text-[#134e4a]">
               사용처별 고객의 판단 맥락이 다르기 때문에, 같은 상품이라도 첫 화면의 정보 우선순위와 설득 흐름이 달라집니다.
             </div>
             <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
@@ -1788,7 +1788,7 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
                   <ul className="grid gap-2 text-sm leading-relaxed text-muted-foreground">
                     {channel.points.map((point) => (
                       <li key={point} className="flex gap-2">
-                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#ff6f61]" />
                         <span>{point}</span>
                       </li>
                     ))}
@@ -2000,7 +2000,7 @@ function SectionResultCard({
                 type="button"
                 className={cn(
                   "h-7 shrink-0 rounded-full border border-border bg-white px-2 text-[11px] font-bold text-muted-foreground",
-                  revisionPosition === revisionIndex && "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  revisionPosition === revisionIndex && "border-[#ff9f7a] bg-[#fff3ee] text-[#0f766e]"
                 )}
                 onClick={() => setRevisionIndex(revisionPosition)}
               >
@@ -2087,10 +2087,10 @@ function GenerationProgressPanel({
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-white/55 p-4 backdrop-blur-sm">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-md border border-emerald-200 bg-white/95 p-5 shadow-2xl">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-3xl overflow-y-auto rounded-md border border-[#ffd3c8] bg-white/95 p-5 shadow-2xl">
         <div className="mb-3 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold text-emerald-700">생성 진행 중</p>
+            <p className="text-xs font-bold text-[#e4574f]">생성 진행 중</p>
             <h2 className="mt-1 text-base font-bold">{generationTitle}</h2>
             <p className="mt-1 text-xs text-muted-foreground">{count > 1 ? `${modelLabel} · ` : ""}경과 {formatDuration(progress.elapsedSeconds)}</p>
           </div>
@@ -2103,12 +2103,12 @@ function GenerationProgressPanel({
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+            className="h-full rounded-full bg-[#ff6f61] transition-all duration-700 ease-out"
             style={{ width: `${progress.percent}%` }}
           />
         </div>
         <div className="mt-3 grid grid-cols-[160px_minmax(0,1fr)] gap-3 text-sm max-sm:grid-cols-1">
-          <div className="rounded-md bg-emerald-50 px-3 py-2 font-bold text-emerald-800">{progress.phase}</div>
+          <div className="rounded-md bg-[#fff3ee] px-3 py-2 font-bold text-[#0f766e]">{progress.phase}</div>
           <div className="rounded-md border border-border bg-white px-3 py-2 leading-relaxed text-muted-foreground">
             {isLongWait && modelLabel.includes("OpenAI")
               ? "OpenAI Image 2.0은 이미지 편집 요청이 2분 이상 걸릴 수 있습니다. 특히 긴 상세페이지 캡처나 참조 이미지가 여러 장이면 응답 시간이 길어질 수 있어요."
@@ -2237,7 +2237,7 @@ function MiniThumb() {
   return (
     <div className="relative h-[68px] w-[52px] overflow-hidden rounded-md border border-border bg-muted">
       <div className="absolute left-2 right-2 top-2 h-4 rounded bg-foreground" />
-      <div className="absolute bottom-2 left-2 right-2 h-7 rounded-md bg-gradient-to-br from-emerald-500 to-lime-300" />
+      <div className="absolute bottom-2 left-2 right-2 h-7 rounded-md bg-gradient-to-br from-[#ff6f61] to-[#2dd4bf]" />
     </div>
   );
 }
@@ -2248,7 +2248,8 @@ function PlaceholderThumb({ index }: { index: number }) {
       <div className={cn("mb-2 h-2 rounded-full bg-foreground", index % 2 === 0 && "w-2/3")} />
       <div className="mb-1 h-1.5 rounded-full bg-zinc-300" />
       <div className="h-1.5 w-3/4 rounded-full bg-zinc-300" />
-      <div className="absolute bottom-3 left-3 right-3 h-[42%] rounded-md bg-gradient-to-br from-emerald-500 to-lime-300" />
+      <div className="absolute bottom-3 left-3 right-3 h-[42%] rounded-md bg-gradient-to-br from-[#ff6f61] to-[#2dd4bf]" />
     </div>
   );
 }
+
