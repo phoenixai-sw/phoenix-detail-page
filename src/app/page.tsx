@@ -10,9 +10,9 @@ export default function Page() {
         fill
         priority
         sizes="100vw"
-        className="object-cover opacity-58"
+        className="object-contain opacity-72"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,13,24,0.62),rgba(8,13,24,0.24)_42%,rgba(8,13,24,0.86))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,13,24,0.72),rgba(8,13,24,0.18)_42%,rgba(8,13,24,0.84))]" />
 
       <header className="relative z-10 flex h-20 items-center justify-between px-6 max-sm:h-16 max-sm:px-4">
         <Link href="/" className="flex items-center gap-3">

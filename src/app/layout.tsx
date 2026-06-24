@@ -16,8 +16,9 @@ export const metadata: Metadata = {
   title: "phoenix detail page",
   description: "기존 상세페이지 이미지와 PDF를 분석해 구매전환 중심 상세페이지 이미지로 리디자인합니다.",
   icons: {
-    icon: "/icon.svg",
-    apple: "/apple-icon.svg"
+    icon: "/phoenix-ai-logo.png",
+    shortcut: "/phoenix-ai-logo.png",
+    apple: "/phoenix-ai-logo.png"
   }
 };
 
