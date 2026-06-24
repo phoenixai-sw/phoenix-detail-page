@@ -1728,6 +1728,7 @@ function Workspace(props: {
 
 function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = React.useState(false);
+  const selectedValue = value === "자사몰" ? "맞춤형 웹/앱" : value;
   const channels = [
     {
       name: "스마트스토어",
@@ -1738,12 +1739,8 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
       points: ["더 빠른 구매 판단 중심", "첫 화면에서 핵심 정보와 가격/구성/배송/후기 신뢰를 강하게", "긴 브랜드 스토리보다 왜 지금 사야 하는지 압축", "썸네일처럼 잘 읽히는 굵은 카피와 정보 카드가 유리"]
     },
     {
-      name: "자사몰",
-      points: ["브랜드 톤앤매너와 스토리 비중이 더 큼", "제품 차별화, 브랜드 신뢰, 보증, 후기 흐름을 더 여유 있게 구성", "단순 구매보다 브랜드 설득과 재구매까지 고려"]
-    },
-    {
-      name: "와디즈",
-      points: ["문제 제기 → 해결책 → 제작 이유 → 검증 → 리워드/FAQ 흐름", "제품 탄생 배경, 개발 과정, 상세 검증, 리워드 구성이 중요", "왜 이 제품이 새롭고 믿을 만한가를 더 서사적으로 보여줌"]
+      name: "맞춤형 웹/앱",
+      points: ["브랜드 톤앤매너와 인터랙션 흐름을 더 자유롭게 반영", "랜딩, 앱 화면, 가입/문의 CTA까지 연결되는 설득 구조", "단순 구매보다 서비스 이해, 신뢰, 전환 행동을 함께 고려"]
     }
   ];
 
@@ -1764,7 +1761,7 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
         {channels.map((channel) => (
           <button
             key={channel.name}
-            className={cn("min-h-9 rounded-md border border-border bg-white px-2 text-xs font-bold", value === channel.name && "bg-foreground text-background")}
+            className={cn("min-h-9 rounded-md border border-border bg-white px-2 text-xs font-bold", selectedValue === channel.name && "bg-foreground text-background")}
             onClick={() => onChange(channel.name)}
           >
             {channel.name}
