@@ -299,7 +299,7 @@ export function RedesignWizard() {
     try {
       localStorage.setItem(knowledgeStorageKey, JSON.stringify(knowledgeItems));
     } catch {
-      setToast("맞춤형 Data 셋팅 텍스트가 커서 일부 저장에 실패했습니다. 파일 수나 크기를 줄여주세요.");
+      setToast("맞춤형 Data 설정 텍스트가 커서 일부 저장에 실패했습니다. 파일 수나 크기를 줄여주세요.");
     }
   }, [knowledgeItems]);
 
@@ -335,7 +335,7 @@ export function RedesignWizard() {
     }
 
     if (useSharedKnowledge && serverConfig.knowledgeAccessRequired && !knowledgeAccessKey.trim()) {
-      setToast("맞춤형 Data 셋팅 사용 키를 입력해주세요.");
+      setToast("맞춤형 Data 설정 사용 키를 입력해주세요.");
       return null;
     }
 
@@ -381,7 +381,7 @@ export function RedesignWizard() {
       setToast("원본 분석과 실제 이미지 생성을 시작합니다.");
       const knowledgeText = useSharedKnowledge
         ? knowledgeItems
-            .map((item, index) => `# 맞춤형 Data 셋팅 ${index + 1}: ${item.name}\n${item.text}`)
+            .map((item, index) => `# 맞춤형 Data 설정 ${index + 1}: ${item.name}\n${item.text}`)
             .join("\n\n")
             .slice(0, 60000)
         : "";
@@ -530,12 +530,12 @@ export function RedesignWizard() {
     const selected = nextFiles.slice(0, 5);
     if (selected.length === 0) return;
     if (serverConfig.knowledgeAdminRequired && !knowledgeAdminKey.trim()) {
-      setToast("맞춤형 Data 셋팅 관리 키를 입력해주세요.");
+      setToast("맞춤형 Data 설정 관리 키를 입력해주세요.");
       setKnowledgeOpen(true);
       return;
     }
 
-    setToast("맞춤형 Data 셋팅 파일을 읽고 적용을 준비하는 중입니다.");
+    setToast("맞춤형 Data 설정 파일을 읽고 적용을 준비하는 중입니다.");
     try {
       const items: KnowledgeItem[] = [];
       for (const file of selected) {
@@ -557,16 +557,16 @@ export function RedesignWizard() {
       const filtered = items.filter((item) => item.text.trim().length > 0);
       setKnowledgeItems((current) => [...filtered, ...current].slice(0, 5));
       const indexedCount = filtered.filter((item) => item.indexed).length;
-      setToast(indexedCount > 0 ? `${indexedCount}개 맞춤형 Data 셋팅을 적용했습니다.` : `${filtered.length}개 맞춤형 Data 셋팅을 로컬로 등록했습니다.`);
+      setToast(indexedCount > 0 ? `${indexedCount}개 맞춤형 Data 설정을 적용했습니다.` : `${filtered.length}개 맞춤형 Data 설정을 로컬로 등록했습니다.`);
       fetchServerConfig().then(setServerConfig);
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "맞춤형 Data 셋팅 등록 중 오류가 발생했습니다.");
+      setToast(error instanceof Error ? error.message : "맞춤형 Data 설정 등록 중 오류가 발생했습니다.");
     }
   }
 
   async function deleteKnowledgeItem(item: KnowledgeItem) {
     if (serverConfig.knowledgeAdminRequired && !knowledgeAdminKey.trim()) {
-      setToast("맞춤형 Data 셋팅 삭제용 관리 키를 입력해주세요.");
+      setToast("맞춤형 Data 설정 삭제용 관리 키를 입력해주세요.");
       setKnowledgeOpen(true);
       return;
     }
@@ -574,10 +574,10 @@ export function RedesignWizard() {
     setKnowledgeItems((current) => current.filter((candidate) => candidate.id !== item.id));
     try {
       await deleteIndexedKnowledge(item.documentId, knowledgeAdminKey);
-      setToast("맞춤형 Data 셋팅을 삭제했습니다.");
+      setToast("맞춤형 Data 설정을 삭제했습니다.");
       fetchServerConfig().then(setServerConfig);
     } catch {
-      setToast("화면 목록에서는 삭제했지만 맞춤형 Data 셋팅 저장소 삭제 확인은 실패했습니다.");
+      setToast("화면 목록에서는 삭제했지만 맞춤형 Data 설정 저장소 삭제 확인은 실패했습니다.");
     }
   }
 
@@ -739,7 +739,7 @@ export function RedesignWizard() {
               <Badge className="shrink-0 whitespace-nowrap" variant={googleKey ? "pulseBlue" : "pulseRed"}>{googleKey ? "설정됨" : "미설정"}</Badge>
             </div>
             <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
-              <span className="min-w-0 flex-1 truncate">맞춤형 Data 셋팅</span>
+              <span className="min-w-0 flex-1 truncate">맞춤형 Data 설정</span>
               <Badge className="shrink-0 whitespace-nowrap" variant={serverConfig.knowledgeConfigured ? "pulseBlue" : "pulseRed"}>{serverConfig.knowledgeConfigured ? "설정됨" : "미설정"}</Badge>
             </div>
           </CardContent>
@@ -803,7 +803,7 @@ export function RedesignWizard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>API 키 설정</DialogTitle>
-            <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 맞춤형 Data 셋팅 검색용으로만 사용합니다.</DialogDescription>
+            <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 맞춤형 Data 설정 검색용으로만 사용합니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             <div>
@@ -826,7 +826,7 @@ export function RedesignWizard() {
       <Dialog open={knowledgeOpen} onOpenChange={setKnowledgeOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>맞춤형 Data 셋팅</DialogTitle>
+            <DialogTitle>맞춤형 Data 설정</DialogTitle>
             <DialogDescription>운영자가 등록한 PDF/TXT/MD 파일은 접근 키를 가진 사용자에게 공통 적용됩니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
@@ -881,7 +881,7 @@ export function RedesignWizard() {
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                등록된 맞춤형 Data 셋팅이 없습니다. 운영자가 등록한 파일은 사용자가 접근 키를 입력했을 때만 제작 요청에 반영됩니다.
+                등록된 맞춤형 Data 설정이 없습니다. 운영자가 등록한 파일은 사용자가 접근 키를 입력했을 때만 제작 요청에 반영됩니다.
               </p>
             )}
             <div className="flex justify-end">
@@ -1235,7 +1235,7 @@ async function extractKnowledgeText(files: File[]) {
   }
 
   return chunks
-    .map((chunk, index) => `# 맞춤형 Data 셋팅 ${index + 1}\n${chunk}`)
+    .map((chunk, index) => `# 맞춤형 Data 설정 ${index + 1}\n${chunk}`)
     .join("\n\n")
     .slice(0, 120000);
 }
@@ -1249,7 +1249,7 @@ async function indexKnowledgeFile(name: string, text: string, adminKey: string):
     body: JSON.stringify({ name, text, adminKey })
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "맞춤형 Data 셋팅 적용 실패");
+  if (!response.ok) throw new Error(data.error || "맞춤형 Data 설정 적용 실패");
   return {
     indexed: Boolean(data.indexed),
     chunks: Number(data.chunks || 0),
@@ -1436,7 +1436,7 @@ function Dashboard({
     <section>
       <Topbar eyebrow="HOME">
         <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />API 키 설정</Button>
-        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />맞춤형 Data 셋팅 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
+        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />맞춤형 Data 설정 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
         <Button onClick={onNew}><Sparkles className="size-4" />새 작업 시작</Button>
       </Topbar>
 
@@ -1516,7 +1516,7 @@ function Dashboard({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>맞춤형 Data 셋팅</CardTitle>
+                <CardTitle>맞춤형 Data 설정</CardTitle>
                 <CardDescription>접근 키가 있는 사용자에게만 적용되는 맞춤형 파일</CardDescription>
               </div>
             </CardHeader>
@@ -1651,9 +1651,9 @@ function Workspace(props: {
             <CardContent className="grid gap-3 p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <strong>맞춤형 Data 셋팅 사용</strong>
+                  <strong>맞춤형 Data 설정 사용</strong>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    접근 키가 맞으면 운영자가 등록한 맞춤형 Data 셋팅을 제작 프롬프트에 반영합니다.
+                    접근 키가 맞으면 운영자가 등록한 맞춤형 Data 설정을 제작 프롬프트에 반영합니다.
                   </p>
                 </div>
                 <Badge variant={knowledgeCount > 0 ? "green" : "default"}>{knowledgeCount}개 등록</Badge>
@@ -2261,4 +2261,5 @@ function PlaceholderThumb({ index }: { index: number }) {
     </div>
   );
 }
+
 
