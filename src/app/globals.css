@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #f7f8f5;
-  --color-foreground: #171a1f;
+  --color-background: #f7f4ef;
+  --color-foreground: #161716;
   --color-card: #ffffff;
-  --color-card-foreground: #171a1f;
-  --color-muted: #edf2ec;
-  --color-muted-foreground: #6b7280;
-  --color-border: #dfe4dc;
-  --color-ring: rgba(47, 191, 113, 0.28);
+  --color-card-foreground: #161716;
+  --color-muted: #eeebe4;
+  --color-muted-foreground: #706d66;
+  --color-border: #ddd5c8;
+  --color-ring: rgba(191, 139, 57, 0.32);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
@@ -20,8 +20,9 @@
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.82), rgba(247,248,245,0.96)),
-    repeating-linear-gradient(90deg, rgba(23,26,31,0.025) 0 1px, transparent 1px 80px);
+    linear-gradient(180deg, rgba(255,255,255,0.88), rgba(247,244,239,0.96)),
+    radial-gradient(circle at 0 0, rgba(191,139,57,0.12), transparent 28rem),
+    repeating-linear-gradient(90deg, rgba(22,23,22,0.024) 0 1px, transparent 1px 84px);
   color: var(--color-foreground);
   letter-spacing: 0;
 }

@@ -334,7 +334,7 @@ export function RedesignWizard() {
     }
 
     if (useSharedKnowledge && serverConfig.knowledgeAccessRequired && !knowledgeAccessKey.trim()) {
-      setToast("공통 사전 지식 사용 키를 입력해주세요.");
+      setToast("공통 레퍼런스 사용 키를 입력해주세요.");
       return null;
     }
 
@@ -495,7 +495,7 @@ export function RedesignWizard() {
     setOpenaiKey(nextOpenaiKey);
     setGoogleKey(nextGoogleKey);
     setSettingsOpen(false);
-    setToast("API 키 설정을 저장했습니다.");
+    setToast("연동 키 설정을 저장했습니다.");
   }
 
   function clearSettings() {
@@ -529,7 +529,7 @@ export function RedesignWizard() {
     const selected = nextFiles.slice(0, 5);
     if (selected.length === 0) return;
     if (serverConfig.knowledgeAdminRequired && !knowledgeAdminKey.trim()) {
-      setToast("지식파일 등록용 운영자 키를 입력해주세요.");
+      setToast("레퍼런스 등록용 관리 키를 입력해주세요.");
       setKnowledgeOpen(true);
       return;
     }
@@ -559,7 +559,7 @@ export function RedesignWizard() {
       setToast(indexedCount > 0 ? `${indexedCount}개 지식파일을 RAG로 인덱싱했습니다.` : `${filtered.length}개 지식파일을 로컬 fallback으로 등록했습니다.`);
       fetchServerConfig().then(setServerConfig);
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "지식파일 등록 중 오류가 발생했습니다.");
+      setToast(error instanceof Error ? error.message : "레퍼런스 등록 중 오류가 발생했습니다.");
     }
   }
 
@@ -592,9 +592,9 @@ export function RedesignWizard() {
       await saveProjectToDb(savedProject);
       setProjects((current) => [savedProject, ...current.filter((candidate) => candidate.id !== savedProject.id)].slice(0, 20));
       setActiveProject(savedProject);
-      setToast("작업을 저장했습니다. 대시보드에서 다시 열 수 있습니다.");
+      setToast("결과를 저장했습니다. 홈보드에서 다시 열 수 있습니다.");
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "작업 저장 중 오류가 발생했습니다.");
+      setToast(error instanceof Error ? error.message : "결과 저장 중 오류가 발생했습니다.");
     }
   }
 
@@ -617,7 +617,7 @@ export function RedesignWizard() {
       return;
     }
     if (!trimmedEditRequest) {
-      setToast("섹션 수정 요청을 입력하거나 빠른 입력 버튼을 선택해주세요.");
+      setToast("부분 편집 메모를 입력하거나 빠른 입력 버튼을 선택해주세요.");
       return;
     }
 
@@ -663,13 +663,13 @@ export function RedesignWizard() {
       };
       setActiveProject(updatedProject);
       setProjects((current) => [updatedProject, ...current.filter((candidate) => candidate.id !== updatedProject.id)].slice(0, 20));
-      setToast(`${section.name} 수정 완료. 마음에 들면 작업 저장을 눌러주세요.`);
+      setToast(`${section.name} 편집 완료. 마음에 들면 결과 저장을 눌러주세요.`);
     } catch (error) {
       reportClientLog("edit-section:error", {
         sectionId,
         message: error instanceof Error ? error.message : "unknown"
       });
-      if (isAbortError(error)) setToast("섹션 수정 요청을 취소했습니다.");
+      if (isAbortError(error)) setToast("부분 편집 요청을 취소했습니다.");
       else setToast(error instanceof Error ? error.message : "섹션 수정 중 오류가 발생했습니다.");
     } finally {
       if (generationAbortRef.current === abortController) generationAbortRef.current = null;
@@ -688,29 +688,29 @@ export function RedesignWizard() {
 
   return (
     <div className="grid min-h-screen grid-cols-[248px_minmax(0,1fr)] max-[1120px]:grid-cols-1">
-      <aside className="sticky top-0 h-screen border-r border-border bg-white/75 p-5 backdrop-blur max-[1120px]:static max-[1120px]:h-auto max-[1120px]:border-b max-[1120px]:border-r-0">
+      <aside className="sticky top-0 h-screen border-r border-border bg-white/70 p-5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.5)] backdrop-blur max-[1120px]:static max-[1120px]:h-auto max-[1120px]:border-b max-[1120px]:border-r-0">
         <button
           type="button"
           className="mb-6 flex items-center gap-3 rounded-md text-left transition hover:opacity-75"
           onClick={() => setView("dashboard")}
-          aria-label="대시보드로 이동"
+          aria-label="홈보드로 이동"
         >
-          <div className="grid size-9 place-items-center rounded-md bg-foreground text-xs font-black text-background">PD</div>
+          <div className="grid size-9 place-items-center rounded-md bg-foreground text-xs font-black text-amber-200 shadow-sm">PD</div>
           <div>
             <strong className="block text-sm leading-tight">phoenix detail page</strong>
           </div>
         </button>
         <nav className="grid gap-1.5 max-[1120px]:grid-cols-3">
           {[
-            ["dashboard", "대시보드", "01"],
-            ["workspace", "리디자인 작업", "02"],
-            ["results", "결과 확인", "03"]
+            ["dashboard", "홈보드", "01"],
+            ["workspace", "제작실", "02"],
+            ["results", "결과함", "03"]
           ].map(([id, label, index]) => (
             <button
               key={id}
               className={cn(
                 "flex h-10 items-center justify-between rounded-md px-3 text-left text-sm text-muted-foreground",
-                view === id && "bg-foreground text-background shadow-sm"
+                view === id && "bg-foreground text-background shadow-sm ring-1 ring-amber-200/50"
               )}
               onClick={() => setView(id as View)}
             >
@@ -793,8 +793,8 @@ export function RedesignWizard() {
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>API 키 설정</DialogTitle>
-            <DialogDescription>이미지 생성은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 공통 지식 RAG 검색용으로만 사용합니다.</DialogDescription>
+            <DialogTitle>연동 키 관리</DialogTitle>
+            <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 공통 레퍼런스 검색용으로만 사용합니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             <div>
@@ -806,7 +806,7 @@ export function RedesignWizard() {
               <Input type="password" value={googleKey} onChange={(event) => setGoogleKey(event.target.value)} placeholder="AIza..." />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={clearSettings}>키 초기화</Button>
+              <Button variant="ghost" onClick={clearSettings}>입력값 초기화</Button>
               <Button variant="secondary" onClick={() => setSettingsOpen(false)}>닫기</Button>
               <Button onClick={saveSettings}>저장</Button>
             </div>
@@ -817,18 +817,18 @@ export function RedesignWizard() {
       <Dialog open={knowledgeOpen} onOpenChange={setKnowledgeOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>사전 지식 파일 등록</DialogTitle>
-            <DialogDescription>운영자가 등록한 PDF/TXT/MD 지식파일은 접근 키를 가진 사용자에게 공통 적용됩니다.</DialogDescription>
+            <DialogTitle>레퍼런스 자료 등록</DialogTitle>
+            <DialogDescription>운영자가 등록한 PDF/TXT/MD 자료는 접근 키를 가진 사용자에게 공통 적용됩니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             {serverConfig.knowledgeAdminRequired ? (
               <div>
-                <label className="mb-2 block text-xs font-bold text-muted-foreground">운영자 등록 키</label>
+                <label className="mb-2 block text-xs font-bold text-muted-foreground">자료 관리 키</label>
                 <Input
                   type="password"
                   value={knowledgeAdminKey}
                   onChange={(event) => setKnowledgeAdminKey(event.target.value)}
-                  placeholder="지식파일 등록/삭제 권한 키"
+                  placeholder="레퍼런스 등록/삭제 권한 키"
                 />
               </div>
             ) : null}
@@ -842,7 +842,7 @@ export function RedesignWizard() {
               }}
             >
               <FileText className="size-5 text-emerald-600" />
-              PDF, TXT, MD 지식파일 등록
+              PDF, TXT, MD 레퍼런스 등록
             </button>
             <input
               ref={knowledgeInputRef}
@@ -872,7 +872,7 @@ export function RedesignWizard() {
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                등록된 지식파일이 없습니다. 운영자가 등록한 지식은 사용자가 접근 키를 입력했을 때만 생성 요청에 반영됩니다.
+                등록된 레퍼런스가 없습니다. 운영자가 등록한 자료는 사용자가 접근 키를 입력했을 때만 제작 요청에 반영됩니다.
               </p>
             )}
             <div className="flex justify-end">
@@ -935,7 +935,7 @@ async function readApiResponse(response: Response): Promise<any> {
 function simplifyPlainTextError(text: string, status: number) {
   const message = text.trim() || "요청 처리 중 오류가 발생했습니다.";
   if (status === 413 || message.toLowerCase().includes("request entity too large")) {
-    return "이미지 데이터가 너무 커서 섹션 수정 요청을 보낼 수 없습니다. 수정용 이미지를 압축해 다시 시도했지만, 계속 실패하면 해당 섹션을 다시 생성해 주세요.";
+    return "이미지 데이터가 너무 커서 부분 편집 요청을 보낼 수 없습니다. 편집용 이미지를 압축해 다시 시도했지만, 계속 실패하면 해당 섹션을 다시 생성해 주세요.";
   }
   return message.slice(0, 500);
 }
@@ -1425,18 +1425,18 @@ function Dashboard({
 
   return (
     <section>
-      <Topbar eyebrow="DASHBOARD">
-        <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />API 키 설정</Button>
-        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />지식파일 등록 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
-        <Button onClick={onNew}><Sparkles className="size-4" />새 프로젝트 생성</Button>
+      <Topbar eyebrow="HOME">
+        <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />연동 키 관리</Button>
+        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />레퍼런스 등록 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
+        <Button onClick={onNew}><Sparkles className="size-4" />새 작업 시작</Button>
       </Topbar>
 
       <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)] gap-4 max-xl:grid-cols-1">
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>최근 리디자인 프로젝트</CardTitle>
-              <CardDescription>업로드한 원본 자료를 기준으로 생성된 작업 목록</CardDescription>
+                <CardTitle>최근 제작 작업</CardTitle>
+                <CardDescription>업로드한 원본 자료를 기준으로 만든 이미지 작업 목록</CardDescription>
             </div>
             <Badge variant="green">6~8장 기본</Badge>
           </CardHeader>
@@ -1480,9 +1480,9 @@ function Dashboard({
               <div className="grid min-h-48 place-items-center rounded-md border border-dashed border-border bg-white/60 p-6 text-center">
                 <div>
                   <ImageIcon className="mx-auto mb-3 size-8 text-muted-foreground" />
-                  <strong className="text-sm">아직 작업한 리디자인 작업이 없습니다.</strong>
+                  <strong className="text-sm">아직 저장된 제작 작업이 없습니다.</strong>
                   <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                    새 프로젝트를 생성하면 이곳에 최근 작업이 표시됩니다.
+                    새 작업을 시작하면 이곳에 최근 결과가 표시됩니다.
                   </p>
                 </div>
               </div>
@@ -1494,12 +1494,12 @@ function Dashboard({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>오늘의 작업 상태</CardTitle>
-                <CardDescription>전환 설계 중심으로 생성 품질을 추적</CardDescription>
+                <CardTitle>작업 요약</CardTitle>
+                <CardDescription>전환 설계 중심으로 제작 흐름을 확인</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-3">
-              <Stat label="최근" value={String(projects.length)} sub="프로젝트" />
+              <Stat label="최근" value={String(projects.length)} sub="작업" />
               <Stat label="평균" value={averageImageCount} sub="이미지 장수" />
               <Stat label="기본" value="9:16" sub="출력 비율" />
             </CardContent>
@@ -1507,17 +1507,17 @@ function Dashboard({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>사전 지식 라이브러리</CardTitle>
-                <CardDescription>접근 키가 있는 사용자에게만 적용되는 공통 지식</CardDescription>
+                <CardTitle>레퍼런스 라이브러리</CardTitle>
+                <CardDescription>접근 키가 있는 사용자에게만 적용되는 공통 자료</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
-                <span>등록 문서</span>
+                <span>등록 자료</span>
                 <Badge variant={knowledgeCount > 0 ? "green" : "default"}>{knowledgeCount}개</Badge>
               </div>
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
-                <span>RAG 청크</span>
+                <span>검색 청크</span>
                 <Badge variant={serverConfig.knowledgeChunks > 0 ? "green" : "default"}>{serverConfig.knowledgeChunks.toLocaleString()}개</Badge>
               </div>
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
@@ -1583,8 +1583,8 @@ function Workspace(props: {
 
   return (
     <section>
-      <Topbar eyebrow="REDESIGN WORKSPACE">
-        <Button onClick={() => onGenerate()} disabled={generating}>{generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}리디자인 생성</Button>
+      <Topbar eyebrow="STUDIO">
+        <Button onClick={() => onGenerate()} disabled={generating}>{generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}이미지 제작 시작</Button>
       </Topbar>
 
       <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-4 max-xl:grid-cols-1">
@@ -1592,7 +1592,7 @@ function Workspace(props: {
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>기존 상세페이지 자료 업로드</CardTitle>
+                <CardTitle>원본 자료 가져오기</CardTitle>
                 <CardDescription>이미지 또는 PDF를 첨부하면 원본 정보와 전환 저해 요소를 분석합니다.</CardDescription>
               </div>
               <Badge variant="green">대용량 가능</Badge>
@@ -1611,7 +1611,7 @@ function Workspace(props: {
                   <span className="mx-auto mb-3 grid size-14 place-items-center rounded-md border border-border bg-white text-emerald-600">
                     <Upload className="size-7" />
                   </span>
-                  <strong>이미지 또는 PDF를 여기에 놓기</strong>
+                  <strong>이미지 또는 PDF를 여기에 추가</strong>
                   <span className="mt-1 block text-xs text-muted-foreground">원본 제품컷, 수치, 리뷰, 인증, 오퍼 문구를 최대한 보존합니다.</span>
                 </span>
               </button>
@@ -1633,7 +1633,7 @@ function Workspace(props: {
                   ))}
                 </div>
               )}
-              <label className="mt-4 block text-xs font-bold text-muted-foreground">추가 요청사항</label>
+              <label className="mt-4 block text-xs font-bold text-muted-foreground">제작 요청 메모</label>
               <Textarea value={request} onChange={(event) => setRequest(event.target.value)} />
             </CardContent>
           </Card>
@@ -1642,9 +1642,9 @@ function Workspace(props: {
             <CardContent className="grid gap-3 p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <strong>공통 사전 지식 사용</strong>
+                  <strong>공통 레퍼런스 사용</strong>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    접근 키가 맞으면 운영자가 등록한 지식파일을 검색해 생성 프롬프트에 반영합니다.
+                    접근 키가 맞으면 운영자가 등록한 레퍼런스를 검색해 제작 프롬프트에 반영합니다.
                   </p>
                 </div>
                 <Badge variant={knowledgeCount > 0 ? "green" : "default"}>{knowledgeCount}개 등록</Badge>
@@ -1667,7 +1667,7 @@ function Workspace(props: {
               </div>
               {useSharedKnowledge && serverConfig.knowledgeAccessRequired ? (
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-muted-foreground">지식 사용 키</label>
+                  <label className="mb-2 block text-xs font-bold text-muted-foreground">레퍼런스 사용 키</label>
                   <Input
                     type="password"
                     value={knowledgeAccessKey}
@@ -1678,7 +1678,7 @@ function Workspace(props: {
               ) : null}
               {useSharedKnowledge && !serverConfig.knowledgeAccessRequired ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  아직 서버에 지식 사용 키가 설정되지 않았습니다. Vercel 환경변수에 키를 설정하면 사용자 입력이 필요해집니다.
+                  아직 서버에 레퍼런스 사용 키가 설정되지 않았습니다. 배포 환경변수에 키를 설정하면 사용자 입력이 필요해집니다.
                 </p>
               ) : null}
             </CardContent>
@@ -1689,8 +1689,8 @@ function Workspace(props: {
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>이미지 생성 모델</CardTitle>
-                <CardDescription>작업마다 사용할 모델을 선택합니다.</CardDescription>
+                <CardTitle>제작 엔진 선택</CardTitle>
+                <CardDescription>작업마다 사용할 이미지 엔진을 선택합니다.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2">
@@ -1710,8 +1710,8 @@ function Workspace(props: {
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>생성 옵션</CardTitle>
-                <CardDescription>상세페이지 섹션 단위로 생성</CardDescription>
+                <CardTitle>제작 조건</CardTitle>
+                <CardDescription>섹션 단위로 결과 이미지를 만듭니다.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -1747,12 +1747,12 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
   return (
     <div>
       <div className="mb-2 flex items-center gap-2">
-        <label className="block text-xs font-bold text-muted-foreground">판매 채널</label>
+        <label className="block text-xs font-bold text-muted-foreground">사용처 선택</label>
         <button
           type="button"
           className="grid size-6 place-items-center rounded-full border border-border bg-white text-muted-foreground transition hover:border-emerald-300 hover:text-emerald-700"
           onClick={() => setOpen(true)}
-          aria-label="판매 채널 설명 보기"
+          aria-label="사용처 설명 보기"
         >
           <CircleHelp className="size-4" />
         </button>
@@ -1772,14 +1772,14 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>판매 채널별 생성 기준</DialogTitle>
+            <DialogTitle>사용처별 제작 기준</DialogTitle>
             <DialogDescription>
-              판매 채널을 선택하면 해당 채널이 이미지 생성 프롬프트에 들어가고, AI가 구성과 문구 톤을 채널에 맞춰 조정합니다.
+              사용처를 선택하면 해당 맥락이 이미지 제작 프롬프트에 들어가고, AI가 구성과 문구 톤을 맞춰 조정합니다.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-relaxed text-emerald-900">
-              채널별 고객의 구매 맥락이 다르기 때문에, 같은 상품이라도 첫 화면의 정보 우선순위와 설득 흐름이 달라집니다.
+              사용처별 고객의 판단 맥락이 다르기 때문에, 같은 상품이라도 첫 화면의 정보 우선순위와 설득 흐름이 달라집니다.
             </div>
             <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
               {channels.map((channel) => (
@@ -1850,18 +1850,18 @@ function Results({
 
   return (
     <section>
-      <Topbar eyebrow="RESULTS" title={title}>
-        <Button variant="secondary" onClick={onSave}><FileText className="size-4" />작업 저장</Button>
+      <Topbar eyebrow="OUTPUT" title={title}>
+        <Button variant="secondary" onClick={onSave}><FileText className="size-4" />결과 저장</Button>
         <Button variant="secondary" onClick={() => onToast("히어로 1장 재생성은 다음 단계에서 연결할 예정입니다.")}><RefreshCw className="size-4" />히어로 다시 생성</Button>
-        <Button onClick={downloadAllImages} disabled={downloadableSections.length === 0}><Download className="size-4" />전체 다운로드</Button>
+        <Button onClick={downloadAllImages} disabled={downloadableSections.length === 0}><Download className="size-4" />결과 다운로드</Button>
       </Topbar>
 
       <div className={cn("grid gap-4", showRollout ? "grid-cols-[minmax(0,1fr)_320px] max-xl:grid-cols-1" : "grid-cols-1")}>
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>리디자인 결과 {project.sections.length}장</CardTitle>
-              <CardDescription>저장하면 대시보드의 최근 프로젝트에서 다시 열 수 있습니다.</CardDescription>
+              <CardTitle>제작 결과 {project.sections.length}장</CardTitle>
+              <CardDescription>저장하면 홈보드의 최근 작업에서 다시 열 수 있습니다.</CardDescription>
             </div>
             <Badge variant="green">{models[project.model].label}</Badge>
           </CardHeader>
@@ -1885,8 +1885,8 @@ function Results({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>히어로 검토 후 요청</CardTitle>
-                <CardDescription>첫 장을 보고 나머지 상세페이지에 반영할 방향을 적어주세요.</CardDescription>
+                <CardTitle>첫 장 확인 후 메모</CardTitle>
+                <CardDescription>첫 장을 보고 나머지 이미지에 반영할 방향을 적어주세요.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid gap-3">
@@ -1897,10 +1897,10 @@ function Results({
               />
               <Button onClick={onGenerateRest} disabled={generating}>
                 {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                나머지 상세페이지 만들기
+                나머지 섹션 만들기
               </Button>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                이 요청은 S2 이후 섹션 생성 프롬프트에 함께 반영됩니다. 테스트 비용을 줄이기 위해 먼저 히어로 1장을 확인한 뒤 확장하는 흐름입니다.
+                이 요청은 S2 이후 섹션 제작 프롬프트에 함께 반영됩니다. 테스트 비용을 줄이기 위해 먼저 첫 장을 확인한 뒤 확장하는 흐름입니다.
               </p>
             </CardContent>
           </Card>
@@ -2025,11 +2025,11 @@ function SectionResultCard({
           이미지 다운로드
         </Button>
         <div className="grid gap-2 rounded-md border border-border bg-muted/40 p-2">
-          <label className="text-xs font-bold text-muted-foreground">섹션 수정 요청</label>
+          <label className="text-xs font-bold text-muted-foreground">부분 편집 메모</label>
           <Textarea
             value={editRequest}
             onChange={(event) => setEditRequest(event.target.value)}
-            placeholder="예: 이 섹션은 헤드라인을 줄이고, 제품 이미지를 오른쪽으로 옮겨 다른 섹션과 덜 반복되게 해주세요."
+            placeholder="예: 이 이미지는 헤드라인을 줄이고, 제품 이미지를 오른쪽으로 옮겨 다른 섹션과 덜 반복되게 해주세요."
             className="min-h-20 text-xs"
           />
           <div className="flex flex-wrap gap-1.5">
@@ -2040,7 +2040,7 @@ function SectionResultCard({
             ))}
           </div>
           <OptionGroup
-            label="수정 모델"
+            label="편집 엔진"
             value={editModel}
             options={[["openai", "OpenAI Image 2.0"], ["google", "Nano Banana 2"]]}
             onChange={(value) => setEditModel(value as Model)}
@@ -2051,7 +2051,7 @@ function SectionResultCard({
             disabled={disabled || editing}
           >
             {editing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            이 섹션 수정
+            이 이미지 편집
           </Button>
         </div>
       </CardContent>
