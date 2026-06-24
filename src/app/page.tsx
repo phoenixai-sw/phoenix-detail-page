@@ -5,7 +5,7 @@ export default function Page() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#080d18] text-white">
       <Image
-        src="/phoenix-web-promo.png"
+        src="/main-page-image.png"
         alt=""
         fill
         priority
@@ -16,8 +16,8 @@ export default function Page() {
 
       <header className="relative z-10 flex h-20 items-center justify-between px-6 max-sm:h-16 max-sm:px-4">
         <Link href="/" className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center overflow-hidden rounded-md border border-white/15 bg-white/8">
-            <Image src="/icon.svg" alt="Phoenix" width={26} height={26} />
+          <span className="grid size-12 place-items-center overflow-hidden rounded-md border border-white/15 bg-white/90">
+            <Image src="/phoenix-ai-logo.png" alt="Phoenix AI" width={44} height={44} className="object-contain" />
           </span>
           <span className="text-base font-semibold tracking-normal">PhoenixAI</span>
         </Link>

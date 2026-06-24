@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (useKnowledge && !canUseCommonKnowledge(knowledgeAccessKey)) {
-      return NextResponse.json({ error: "공통 사전 지식 사용 키가 올바르지 않습니다." }, { status: 403 });
+      return NextResponse.json({ error: "맞춤형 Data 셋팅 사용 키가 올바르지 않습니다." }, { status: 403 });
     }
 
     const jobId = randomUUID();
@@ -163,7 +163,7 @@ async function buildKnowledgeContext({
 
   try {
     const query = [
-      "상세페이지 리디자인 CRO 지식 검색",
+      "상세페이지 리디자인 맞춤형 Data 셋팅 검색",
       `판매 채널: ${channel}`,
       `추가 요청사항: ${requestText || "전환율 중심 리디자인"}`,
       rolloutRequest ? `히어로 검토 후 요청: ${rolloutRequest}` : ""
@@ -173,7 +173,7 @@ async function buildKnowledgeContext({
 
     return chunks
       .map((chunk, index) => [
-        `# RAG 검색 지식 ${index + 1}: ${chunk.sourceName} / chunk ${chunk.chunkIndex + 1}`,
+        `# 맞춤형 Data 셋팅 ${index + 1}: ${chunk.sourceName} / chunk ${chunk.chunkIndex + 1}`,
         `similarity: ${chunk.similarity.toFixed(3)}`,
         chunk.content
       ].join("\n"))
@@ -205,7 +205,7 @@ async function analyzeSource({
     `판매 채널: ${payload.options.channel}`,
     `추가 요청사항: ${payload.request || "전환율 중심으로 리디자인"}`,
     payload.rolloutRequest ? `히어로 검토 후 나머지 섹션에 반영할 요청: ${payload.rolloutRequest}` : "히어로 검토 후 요청: 없음",
-    payload.knowledgeText ? `사용자 사전 지식:\n${payload.knowledgeText.slice(0, 30000)}` : "사용자 사전 지식: 없음",
+    payload.knowledgeText ? `맞춤형 Data 셋팅:\n${payload.knowledgeText.slice(0, 30000)}` : "맞춤형 Data 셋팅: 없음",
     `이미지 생성 모델: ${modelInfo.label} (${modelInfo.id})`,
     "JSON 키: product_inferred, diagnostic_summary, strategy, page_blueprint, compliance_notes"
   ].join("\n");
@@ -353,7 +353,7 @@ function buildSections(
       `판매 채널: ${payload.options.channel}`,
       `추가 요청사항: ${payload.request || "전환율 중심으로 리디자인"}`,
       payload.rolloutRequest ? `히어로 1장 검토 후 사용자가 요청한 반영사항: ${payload.rolloutRequest}` : "히어로 검토 후 반영사항: 없음",
-      payload.knowledgeText ? `참고 사전 지식: ${payload.knowledgeText.slice(0, 18000)}` : "참고 사전 지식: 없음",
+      payload.knowledgeText ? `맞춤형 Data 셋팅: ${payload.knowledgeText.slice(0, 18000)}` : "맞춤형 Data 셋팅: 없음",
       `분석 요약: ${JSON.stringify(analysis).slice(0, 2400)}`,
       "브랜드명 금지 규칙: 'phoenix detail page', 'Phoenix Detail Page', 'PHOENIX DETAIL PAGE', 'PD'는 서비스명 또는 도구명일 뿐이며 제품 브랜드가 아니다. 이 단어들을 이미지 안의 제품명, 브랜드명, 로고, 라벨, 헤드라인, 후기, FAQ, CTA, 패키지 텍스트로 절대 사용하지 않는다.",
       "브랜드 사용 규칙: 제품 브랜드명과 제품명은 업로드된 원본 상세페이지 또는 제품 패키지에서 확인되는 이름만 사용한다. 원본에서 확인되지 않는 새 브랜드명, 새 제품명, 새 로고를 만들지 않는다.",

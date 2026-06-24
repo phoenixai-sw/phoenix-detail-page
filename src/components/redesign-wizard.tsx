@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import * as React from "react";
+import NextImage from "next/image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -298,7 +299,7 @@ export function RedesignWizard() {
     try {
       localStorage.setItem(knowledgeStorageKey, JSON.stringify(knowledgeItems));
     } catch {
-      setToast("지식파일 텍스트가 커서 일부 저장에 실패했습니다. 파일 수나 크기를 줄여주세요.");
+      setToast("맞춤형 Data 셋팅 텍스트가 커서 일부 저장에 실패했습니다. 파일 수나 크기를 줄여주세요.");
     }
   }, [knowledgeItems]);
 
@@ -334,7 +335,7 @@ export function RedesignWizard() {
     }
 
     if (useSharedKnowledge && serverConfig.knowledgeAccessRequired && !knowledgeAccessKey.trim()) {
-      setToast("공통 레퍼런스 사용 키를 입력해주세요.");
+      setToast("맞춤형 Data 셋팅 사용 키를 입력해주세요.");
       return null;
     }
 
@@ -380,7 +381,7 @@ export function RedesignWizard() {
       setToast("원본 분석과 실제 이미지 생성을 시작합니다.");
       const knowledgeText = useSharedKnowledge
         ? knowledgeItems
-            .map((item, index) => `# 등록 지식파일 ${index + 1}: ${item.name}\n${item.text}`)
+            .map((item, index) => `# 맞춤형 Data 셋팅 ${index + 1}: ${item.name}\n${item.text}`)
             .join("\n\n")
             .slice(0, 60000)
         : "";
@@ -529,12 +530,12 @@ export function RedesignWizard() {
     const selected = nextFiles.slice(0, 5);
     if (selected.length === 0) return;
     if (serverConfig.knowledgeAdminRequired && !knowledgeAdminKey.trim()) {
-      setToast("레퍼런스 등록용 관리 키를 입력해주세요.");
+      setToast("맞춤형 Data 셋팅 관리 키를 입력해주세요.");
       setKnowledgeOpen(true);
       return;
     }
 
-    setToast("지식파일을 읽고 RAG 인덱싱을 준비하는 중입니다.");
+    setToast("맞춤형 Data 셋팅 파일을 읽고 적용을 준비하는 중입니다.");
     try {
       const items: KnowledgeItem[] = [];
       for (const file of selected) {
@@ -556,16 +557,16 @@ export function RedesignWizard() {
       const filtered = items.filter((item) => item.text.trim().length > 0);
       setKnowledgeItems((current) => [...filtered, ...current].slice(0, 5));
       const indexedCount = filtered.filter((item) => item.indexed).length;
-      setToast(indexedCount > 0 ? `${indexedCount}개 지식파일을 RAG로 인덱싱했습니다.` : `${filtered.length}개 지식파일을 로컬 fallback으로 등록했습니다.`);
+      setToast(indexedCount > 0 ? `${indexedCount}개 맞춤형 Data 셋팅을 적용했습니다.` : `${filtered.length}개 맞춤형 Data 셋팅을 로컬로 등록했습니다.`);
       fetchServerConfig().then(setServerConfig);
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "레퍼런스 등록 중 오류가 발생했습니다.");
+      setToast(error instanceof Error ? error.message : "맞춤형 Data 셋팅 등록 중 오류가 발생했습니다.");
     }
   }
 
   async function deleteKnowledgeItem(item: KnowledgeItem) {
     if (serverConfig.knowledgeAdminRequired && !knowledgeAdminKey.trim()) {
-      setToast("지식파일 삭제용 운영자 키를 입력해주세요.");
+      setToast("맞춤형 Data 셋팅 삭제용 관리 키를 입력해주세요.");
       setKnowledgeOpen(true);
       return;
     }
@@ -573,10 +574,10 @@ export function RedesignWizard() {
     setKnowledgeItems((current) => current.filter((candidate) => candidate.id !== item.id));
     try {
       await deleteIndexedKnowledge(item.documentId, knowledgeAdminKey);
-      setToast("지식파일을 삭제했습니다.");
+      setToast("맞춤형 Data 셋팅을 삭제했습니다.");
       fetchServerConfig().then(setServerConfig);
     } catch {
-      setToast("화면 목록에서는 삭제했지만 RAG 저장소 삭제 확인은 실패했습니다.");
+      setToast("화면 목록에서는 삭제했지만 맞춤형 Data 셋팅 저장소 삭제 확인은 실패했습니다.");
     }
   }
 
@@ -695,7 +696,9 @@ export function RedesignWizard() {
           onClick={() => setView("dashboard")}
           aria-label="홈보드로 이동"
         >
-          <div className="grid size-9 place-items-center rounded-md bg-foreground text-xs font-black text-[#ffd36a] shadow-sm">PD</div>
+          <div className="grid size-11 place-items-center overflow-hidden rounded-md border border-border bg-white shadow-sm">
+            <NextImage src="/phoenix-ai-logo.png" alt="Phoenix AI" width={42} height={42} className="object-contain" />
+          </div>
           <div>
             <strong className="block text-sm leading-tight">phoenix detail page</strong>
           </div>
@@ -730,7 +733,7 @@ export function RedesignWizard() {
               <Badge className="shrink-0 whitespace-nowrap" variant={googleKey ? "green" : "default"}>{googleKey ? "연결 완료" : "키 필요"}</Badge>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 truncate">공통 지식 RAG</span>
+              <span className="min-w-0 flex-1 truncate">맞춤형 Data 셋팅</span>
               <Badge className="shrink-0 whitespace-nowrap" variant={serverConfig.knowledgeConfigured ? "green" : "default"}>{serverConfig.knowledgeConfigured ? "서버 연결" : "미설정"}</Badge>
             </div>
           </CardContent>
@@ -794,7 +797,7 @@ export function RedesignWizard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>연동 키 관리</DialogTitle>
-            <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 공통 레퍼런스 검색용으로만 사용합니다.</DialogDescription>
+            <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 맞춤형 Data 셋팅 검색용으로만 사용합니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             <div>
@@ -817,18 +820,18 @@ export function RedesignWizard() {
       <Dialog open={knowledgeOpen} onOpenChange={setKnowledgeOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>레퍼런스 자료 등록</DialogTitle>
-            <DialogDescription>운영자가 등록한 PDF/TXT/MD 자료는 접근 키를 가진 사용자에게 공통 적용됩니다.</DialogDescription>
+            <DialogTitle>맞춤형 Data 셋팅</DialogTitle>
+            <DialogDescription>운영자가 등록한 PDF/TXT/MD 파일은 접근 키를 가진 사용자에게 공통 적용됩니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
             {serverConfig.knowledgeAdminRequired ? (
               <div>
-                <label className="mb-2 block text-xs font-bold text-muted-foreground">자료 관리 키</label>
+                <label className="mb-2 block text-xs font-bold text-muted-foreground">Data 관리 키</label>
                 <Input
                   type="password"
                   value={knowledgeAdminKey}
                   onChange={(event) => setKnowledgeAdminKey(event.target.value)}
-                  placeholder="레퍼런스 등록/삭제 권한 키"
+                  placeholder="맞춤형 Data 등록/삭제 권한 키"
                 />
               </div>
             ) : null}
@@ -842,7 +845,7 @@ export function RedesignWizard() {
               }}
             >
               <FileText className="size-5 text-[#0d9488]" />
-              PDF, TXT, MD 레퍼런스 등록
+              PDF, TXT, MD 맞춤형 Data 등록
             </button>
             <input
               ref={knowledgeInputRef}
@@ -861,7 +864,7 @@ export function RedesignWizard() {
                       {item.name}
                       <span className="ml-2 text-muted-foreground">{item.text.length.toLocaleString()}자</span>
                       <Badge className="ml-2" variant={item.indexed ? "green" : "default"}>
-                        {item.indexed ? `RAG ${item.chunks || 0} chunks` : "로컬 fallback"}
+                        {item.indexed ? `Data ${item.chunks || 0} chunks` : "로컬 적용"}
                       </Badge>
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => deleteKnowledgeItem(item)}>
@@ -872,7 +875,7 @@ export function RedesignWizard() {
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">
-                등록된 레퍼런스가 없습니다. 운영자가 등록한 자료는 사용자가 접근 키를 입력했을 때만 제작 요청에 반영됩니다.
+                등록된 맞춤형 Data 셋팅이 없습니다. 운영자가 등록한 파일은 사용자가 접근 키를 입력했을 때만 제작 요청에 반영됩니다.
               </p>
             )}
             <div className="flex justify-end">
@@ -1226,7 +1229,7 @@ async function extractKnowledgeText(files: File[]) {
   }
 
   return chunks
-    .map((chunk, index) => `# 지식파일 ${index + 1}\n${chunk}`)
+    .map((chunk, index) => `# 맞춤형 Data 셋팅 ${index + 1}\n${chunk}`)
     .join("\n\n")
     .slice(0, 120000);
 }
@@ -1240,7 +1243,7 @@ async function indexKnowledgeFile(name: string, text: string, adminKey: string):
     body: JSON.stringify({ name, text, adminKey })
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "지식파일 인덱싱 실패");
+  if (!response.ok) throw new Error(data.error || "맞춤형 Data 셋팅 적용 실패");
   return {
     indexed: Boolean(data.indexed),
     chunks: Number(data.chunks || 0),
@@ -1427,7 +1430,7 @@ function Dashboard({
     <section>
       <Topbar eyebrow="HOME">
         <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />연동 키 관리</Button>
-        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />레퍼런스 등록 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
+        <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />맞춤형 Data 셋팅 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
         <Button onClick={onNew}><Sparkles className="size-4" />새 작업 시작</Button>
       </Topbar>
 
@@ -1507,17 +1510,17 @@ function Dashboard({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>레퍼런스 라이브러리</CardTitle>
-                <CardDescription>접근 키가 있는 사용자에게만 적용되는 공통 자료</CardDescription>
+                <CardTitle>맞춤형 Data 셋팅</CardTitle>
+                <CardDescription>접근 키가 있는 사용자에게만 적용되는 맞춤형 파일</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
-                <span>등록 자료</span>
+                <span>등록 Data</span>
                 <Badge variant={knowledgeCount > 0 ? "green" : "default"}>{knowledgeCount}개</Badge>
               </div>
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
-                <span>검색 청크</span>
+                <span>Data 청크</span>
                 <Badge variant={serverConfig.knowledgeChunks > 0 ? "green" : "default"}>{serverConfig.knowledgeChunks.toLocaleString()}개</Badge>
               </div>
               <div className="flex items-center justify-between rounded-md border border-border bg-white p-3">
@@ -1642,9 +1645,9 @@ function Workspace(props: {
             <CardContent className="grid gap-3 p-4 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <strong>공통 레퍼런스 사용</strong>
+                  <strong>맞춤형 Data 셋팅 사용</strong>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    접근 키가 맞으면 운영자가 등록한 레퍼런스를 검색해 제작 프롬프트에 반영합니다.
+                    접근 키가 맞으면 운영자가 등록한 맞춤형 Data 셋팅을 제작 프롬프트에 반영합니다.
                   </p>
                 </div>
                 <Badge variant={knowledgeCount > 0 ? "green" : "default"}>{knowledgeCount}개 등록</Badge>
@@ -1667,7 +1670,7 @@ function Workspace(props: {
               </div>
               {useSharedKnowledge && serverConfig.knowledgeAccessRequired ? (
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-muted-foreground">레퍼런스 사용 키</label>
+                  <label className="mb-2 block text-xs font-bold text-muted-foreground">맞춤형 Data 사용 키</label>
                   <Input
                     type="password"
                     value={knowledgeAccessKey}
@@ -1678,7 +1681,7 @@ function Workspace(props: {
               ) : null}
               {useSharedKnowledge && !serverConfig.knowledgeAccessRequired ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  아직 서버에 레퍼런스 사용 키가 설정되지 않았습니다. 배포 환경변수에 키를 설정하면 사용자 입력이 필요해집니다.
+                  아직 서버에 맞춤형 Data 사용 키가 설정되지 않았습니다. 배포 환경변수에 키를 설정하면 사용자 입력이 필요해집니다.
                 </p>
               ) : null}
             </CardContent>
