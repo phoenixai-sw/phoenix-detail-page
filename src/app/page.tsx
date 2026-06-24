@@ -24,16 +24,12 @@ export default function Page() {
       </header>
 
       <section className="relative z-10 grid min-h-[calc(100vh-9rem)] place-items-center px-5 py-12 text-center">
-        <div className="grid justify-items-center gap-6">
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#ffd36a]">Phoenix Detail Page</p>
-          <h1 className="max-w-4xl text-5xl font-black leading-tight tracking-normal max-md:text-4xl max-sm:text-3xl">
-            phoenix detail page 입장
-          </h1>
+        <div className="grid justify-items-center gap-4">
           <Link
             href="/studio"
-            className="inline-flex min-h-12 items-center justify-center rounded-md bg-[#ff6f61] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(255,111,97,0.34)] transition hover:bg-[#ff806f]"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#ff6f61] px-5 text-xs font-black text-white shadow-[0_18px_45px_rgba(255,111,97,0.34)] transition hover:bg-[#ff806f]"
           >
-            시작하기
+            phoenix detail page 입장
           </Link>
         </div>
       </section>
