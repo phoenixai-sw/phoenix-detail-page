@@ -689,21 +689,22 @@ export function RedesignWizard() {
 
   return (
     <div className="grid min-h-screen grid-cols-[248px_minmax(0,1fr)] max-[1120px]:grid-cols-1">
-      <aside className="sticky top-0 h-screen border-r border-border bg-white/70 p-5 shadow-[inset_-1px_0_0_rgba(255,255,255,0.5)] backdrop-blur max-[1120px]:static max-[1120px]:h-auto max-[1120px]:border-b max-[1120px]:border-r-0">
+      <aside className="sticky top-0 h-screen border-r border-white/60 bg-white/78 p-4 shadow-[inset_-1px_0_0_rgba(255,255,255,0.7),0_20px_60px_rgba(16,23,38,0.06)] backdrop-blur-xl max-[1120px]:static max-[1120px]:h-auto max-[1120px]:border-b max-[1120px]:border-r-0">
         <button
           type="button"
-          className="mb-6 flex items-center gap-3 rounded-md text-left transition hover:opacity-75"
+          className="mb-5 flex w-full items-center gap-3 rounded-md border border-border bg-white/85 p-2.5 text-left shadow-sm transition hover:border-[#ff9f7a] hover:bg-white"
           onClick={() => setView("dashboard")}
           aria-label="홈보드로 이동"
         >
-          <div className="grid size-11 place-items-center overflow-hidden rounded-md border border-border bg-white shadow-sm">
+          <div className="grid size-12 place-items-center overflow-hidden rounded-md border border-[#ffd3c8] bg-[#fff3ee] shadow-sm">
             <NextImage src="/phoenix-ai-logo.png" alt="Phoenix AI" width={42} height={42} className="object-contain" />
           </div>
-          <div>
-            <strong className="block text-sm leading-tight">phoenix detail page</strong>
+          <div className="min-w-0">
+            <strong className="block truncate text-sm leading-tight">phoenix detail page</strong>
+            <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">AI production studio</span>
           </div>
         </button>
-        <nav className="grid gap-1.5 max-[1120px]:grid-cols-3">
+        <nav className="grid gap-2 max-[1120px]:grid-cols-3">
           {[
             ["dashboard", "홈보드", "01"],
             ["workspace", "제작실", "02"],
@@ -712,27 +713,32 @@ export function RedesignWizard() {
             <button
               key={id}
               className={cn(
-                "flex h-10 items-center justify-between rounded-md px-3 text-left text-sm text-muted-foreground",
-                view === id && "bg-foreground text-background shadow-sm ring-1 ring-[#ffd36a]/50"
+                "group relative flex h-11 items-center justify-between overflow-hidden rounded-md border border-transparent px-3 text-left text-sm font-semibold text-muted-foreground transition hover:border-border hover:bg-white/75 hover:text-foreground",
+                view === id && "border-[#ffd3c8] bg-[#101726] text-white shadow-[0_12px_30px_rgba(16,23,38,0.18)]"
               )}
               onClick={() => setView(id as View)}
             >
-              {label}
-              <span>{index}</span>
+              <span className={cn("absolute left-0 top-2 h-7 w-1 rounded-r-full bg-[#ff6f61] opacity-0 transition", view === id && "opacity-100")} />
+              <span className="pl-2">{label}</span>
+              <span className={cn("text-[11px] font-black text-muted-foreground transition group-hover:text-foreground", view === id && "text-[#ffd36a] group-hover:text-[#ffd36a]")}>{index}</span>
             </button>
           ))}
         </nav>
-        <Card className="mt-4">
+        <Card className="mt-5 border-white/70 bg-white/72 shadow-[0_14px_34px_rgba(16,23,38,0.07)]">
           <CardContent className="space-y-3 p-3 text-[11px]">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between border-b border-border/70 pb-2">
+              <strong className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Connections</strong>
+              <span className="size-2 rounded-full bg-[#2dd4bf]" />
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">OpenAI Image 2.0</span>
               <Badge className="shrink-0 whitespace-nowrap" variant={openaiKey ? "green" : "default"}>{openaiKey ? "연결 완료" : "키 필요"}</Badge>
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">Google Nano Banana 2</span>
               <Badge className="shrink-0 whitespace-nowrap" variant={googleKey ? "green" : "default"}>{googleKey ? "연결 완료" : "키 필요"}</Badge>
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">맞춤형 Data 셋팅</span>
               <Badge className="shrink-0 whitespace-nowrap" variant={serverConfig.knowledgeConfigured ? "green" : "default"}>{serverConfig.knowledgeConfigured ? "서버 연결" : "미설정"}</Badge>
             </div>
