@@ -1,0 +1,10 @@
+
+> phoenix-detail-page@1.0.0 dev:local
+> next dev -p 3002
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.0.148:3002
+✓ Ready in 590ms
+
+ GET / 200 in 464ms (next.js: 161ms, application-code: 302ms)
