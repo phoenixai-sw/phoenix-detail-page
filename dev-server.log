@@ -8,3 +8,5 @@
 ✓ Ready in 590ms
 
  GET / 200 in 464ms (next.js: 161ms, application-code: 302ms)
+ GET / 200 in 77ms (next.js: 8ms, application-code: 69ms)
+ GET /api/config 200 in 196ms (next.js: 173ms, application-code: 23ms)
