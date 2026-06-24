@@ -496,7 +496,7 @@ export function RedesignWizard() {
     setOpenaiKey(nextOpenaiKey);
     setGoogleKey(nextGoogleKey);
     setSettingsOpen(false);
-    setToast("연동 키 설정을 저장했습니다.");
+    setToast("API 키 설정을 저장했습니다.");
   }
 
   function clearSettings() {
@@ -802,7 +802,7 @@ export function RedesignWizard() {
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>연동 키 관리</DialogTitle>
+            <DialogTitle>API 키 설정</DialogTitle>
             <DialogDescription>이미지 제작은 여기에 입력한 사용자 키로 실행합니다. 서버 OpenAI 키는 맞춤형 Data 셋팅 검색용으로만 사용합니다.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 p-4">
@@ -1435,7 +1435,7 @@ function Dashboard({
   return (
     <section>
       <Topbar eyebrow="HOME">
-        <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />연동 키 관리</Button>
+        <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />API 키 설정</Button>
         <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />맞춤형 Data 셋팅 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
         <Button onClick={onNew}><Sparkles className="size-4" />새 작업 시작</Button>
       </Topbar>
