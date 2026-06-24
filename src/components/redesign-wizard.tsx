@@ -727,20 +727,20 @@ export function RedesignWizard() {
         <Card className="mt-5 border-white/70 bg-white/72 shadow-[0_14px_34px_rgba(16,23,38,0.07)]">
           <CardContent className="space-y-3 p-3 text-[11px]">
             <div className="flex items-center justify-between border-b border-border/70 pb-2">
-              <strong className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Connections</strong>
+              <strong className="text-[11px] font-black tracking-normal text-muted-foreground">설정 박스</strong>
               <span className="size-2 rounded-full bg-[#2dd4bf]" />
             </div>
             <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">OpenAI Image 2.0</span>
-              <Badge className="shrink-0 whitespace-nowrap" variant={openaiKey ? "green" : "default"}>{openaiKey ? "연결 완료" : "키 필요"}</Badge>
+              <Badge className="shrink-0 whitespace-nowrap" variant={openaiKey ? "pulseBlue" : "pulseRed"}>{openaiKey ? "설정됨" : "미설정"}</Badge>
             </div>
             <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">Google Nano Banana 2</span>
-              <Badge className="shrink-0 whitespace-nowrap" variant={googleKey ? "green" : "default"}>{googleKey ? "연결 완료" : "키 필요"}</Badge>
+              <Badge className="shrink-0 whitespace-nowrap" variant={googleKey ? "pulseBlue" : "pulseRed"}>{googleKey ? "설정됨" : "미설정"}</Badge>
             </div>
             <div className="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2 py-1.5">
               <span className="min-w-0 flex-1 truncate">맞춤형 Data 셋팅</span>
-              <Badge className="shrink-0 whitespace-nowrap" variant={serverConfig.knowledgeConfigured ? "green" : "default"}>{serverConfig.knowledgeConfigured ? "서버 연결" : "미설정"}</Badge>
+              <Badge className="shrink-0 whitespace-nowrap" variant={serverConfig.knowledgeConfigured ? "pulseBlue" : "pulseRed"}>{serverConfig.knowledgeConfigured ? "설정됨" : "미설정"}</Badge>
             </div>
           </CardContent>
         </Card>
