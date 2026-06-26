@@ -6,7 +6,11 @@ import { isRagConfigured, retrieveKnowledge } from "@/lib/rag";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const OPENAI_IMAGE_MODEL = "gpt-image-2-2026-04-21";
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
+const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
+const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
+const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
+const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 const ANALYSIS_MODEL = process.env.OPENAI_ANALYSIS_MODEL || "gpt-5.5";
 const MAX_REFERENCE_IMAGES = 4;
@@ -17,6 +21,12 @@ type ReferenceImage = {
   name: string;
   mimeType: string;
   buffer: Buffer;
+};
+
+type GeneratedImage = {
+  mimeType: string;
+  buffer: Buffer;
+  fallbackNotice?: string;
 };
 
 type Section = {
@@ -90,6 +100,7 @@ export async function POST(request: NextRequest) {
 
     const generatedSections = [];
     const failedSections = [];
+    const fallbackNotices = [];
     for (const [index, section] of sections.entries()) {
       try {
         console.info(`[generate] ${provider} ${section.section_id} start (${index + 1}/${sections.length})`);
@@ -102,6 +113,7 @@ export async function POST(request: NextRequest) {
           imageUrl: `data:${image.mimeType};base64,${image.buffer.toString("base64")}`,
           mimeType: image.mimeType
         });
+        if (image.fallbackNotice) fallbackNotices.push(`${section.name}: ${image.fallbackNotice}`);
         console.info(`[generate] ${provider} ${section.section_id} done bytes=${image.buffer.length} mime=${image.mimeType}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "이미지 생성 실패";
@@ -136,9 +148,12 @@ export async function POST(request: NextRequest) {
         analysis,
         sections: generatedSections,
         failedSections,
-        warning: failedSections.length > 0
-          ? `${generatedSections.length}장은 생성됐고 ${failedSections.length}장 이후는 실패했습니다. OpenAI Image 2.0 요청 제한이면 잠시 후 섹션별 재생성을 실행하세요.`
-          : ""
+        warning: [
+          ...fallbackNotices,
+          failedSections.length > 0
+            ? `${generatedSections.length}장은 생성됐고 ${failedSections.length}장 이후는 실패했습니다. OpenAI Image 2.0 요청 제한이면 잠시 후 섹션별 재생성을 실행하세요.`
+            : ""
+        ].filter(Boolean).join(" ")
       }
     });
   } catch (error) {
@@ -279,13 +294,41 @@ async function analyzeWithGoogle({ apiKey, prompt, references }: { apiKey: strin
   return parseMaybeJson(text);
 }
 
-async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }) {
+async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }): Promise<GeneratedImage> {
+  try {
+    return await generateOpenAIImageWithQuality({ apiKey, prompt, references, quality: OPENAI_IMAGE_QUALITY });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!shouldFallbackOpenAIQuality(message) || OPENAI_IMAGE_QUALITY === OPENAI_IMAGE_FALLBACK_QUALITY) {
+      throw error;
+    }
+
+    const fallbackNotice = `OpenAI Image 2.0 high 품질 응답이 지연되어 모델 설정을 medium 품질로 자동 변경해 생성했습니다.`;
+    console.warn(`[generate] OpenAI quality fallback ${OPENAI_IMAGE_QUALITY} -> ${OPENAI_IMAGE_FALLBACK_QUALITY}: ${message}`);
+    const fallbackImage = await generateOpenAIImageWithQuality({ apiKey, prompt, references, quality: OPENAI_IMAGE_FALLBACK_QUALITY });
+    return { ...fallbackImage, fallbackNotice };
+  }
+}
+
+async function generateOpenAIImageWithQuality({
+  apiKey,
+  prompt,
+  references,
+  quality
+}: {
+  apiKey: string;
+  prompt: string;
+  references: ReferenceImage[];
+  quality: string;
+}): Promise<GeneratedImage> {
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
   form.append("prompt", prompt);
-  form.append("size", "1152x2048");
-  form.append("quality", "low");
+  form.append("size", OPENAI_IMAGE_SIZE);
+  form.append("quality", quality);
   form.append("output_format", "png");
+  form.append("stream", "true");
+  form.append("partial_images", OPENAI_IMAGE_PARTIAL_IMAGES);
 
   for (const reference of references.slice(0, MAX_REFERENCE_IMAGES)) {
     form.append("image[]", new Blob([new Uint8Array(reference.buffer)], { type: reference.mimeType }), reference.name);
@@ -297,14 +340,12 @@ async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: str
     body: form
   });
 
-  const data = await readJsonResponse(response);
-  if (!response.ok) throw new Error(withRequestId(data?.error?.message || "OpenAI Image 2.0 생성 실패", response));
-  const imageBase64 = data?.data?.[0]?.b64_json;
+  const imageBase64 = await readOpenAIImageResponse(response, "OpenAI Image 2.0 생성 실패");
   if (!imageBase64) throw new Error("OpenAI 응답에 이미지 데이터가 없습니다.");
   return { mimeType: "image/png", buffer: Buffer.from(imageBase64, "base64") };
 }
 
-async function generateGoogleImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }) {
+async function generateGoogleImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }): Promise<GeneratedImage> {
   const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: prompt }];
   for (const reference of references.slice(0, MAX_REFERENCE_IMAGES)) {
     parts.push({
@@ -458,8 +499,60 @@ async function readJsonResponse(response: Response) {
   try {
     return JSON.parse(text);
   } catch {
-    return { error: { message: text || response.statusText } };
+    return { error: { message: simplifyProviderTextError(text || response.statusText, response.status) } };
   }
+}
+
+async function readOpenAIImageResponse(response: Response, fallbackMessage: string) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!response.ok) {
+    const data = await readJsonResponse(response);
+    throw new Error(withRequestId(data?.error?.message || fallbackMessage, response));
+  }
+
+  if (contentType.includes("text/event-stream")) {
+    return readOpenAIImageStream(response);
+  }
+
+  const data = await readJsonResponse(response);
+  return data?.data?.[0]?.b64_json || "";
+}
+
+async function readOpenAIImageStream(response: Response) {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let imageBase64 = "";
+
+  const consumeLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return;
+
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+
+    try {
+      const event = JSON.parse(payload);
+      imageBase64 = event.b64_json || event.data?.[0]?.b64_json || imageBase64;
+    } catch {
+      // Non-JSON SSE lines are metadata; the final image arrives as JSON.
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || "";
+    for (const line of lines) consumeLine(line);
+  }
+
+  if (buffer) consumeLine(buffer);
+  return imageBase64;
 }
 
 function withRequestId(message: string, response: Response) {
@@ -468,6 +561,9 @@ function withRequestId(message: string, response: Response) {
 }
 
 function humanizeProviderError(message: string) {
+  if (isTimeoutHtmlError(message)) {
+    return "OpenAI 이미지 생성 응답 시간이 초과되었습니다. 업로드 이미지를 더 작게 줄이거나, 긴 상세페이지 이미지는 나눠서 업로드한 뒤 다시 시도해주세요.";
+  }
   if (message.includes("Incorrect API key provided")) {
     return [
       "OpenAI API 키가 올바르지 않습니다.",
@@ -482,7 +578,7 @@ function humanizeProviderError(message: string) {
       message.match(/request_id: [^)]+/)?.[0] || ""
     ].filter(Boolean).join(" ");
   }
-  if (message.includes("must be verified") && message.includes("gpt-image-2-2026-04-21")) {
+  if (message.includes("must be verified") && message.includes("gpt-image")) {
     return [
       "OpenAI Image 2.0 사용 권한이 아직 없습니다.",
       "이 모델은 OpenAI 조직 인증이 필요합니다.",
@@ -499,6 +595,52 @@ function humanizeProviderError(message: string) {
     ].filter(Boolean).join(" ");
   }
   return message;
+}
+
+function simplifyProviderTextError(message: string, status: number) {
+  if (isTimeoutHtmlError(message)) {
+    return "OpenAI 이미지 생성 응답 시간이 초과되었습니다. 업로드 이미지를 더 작게 줄이거나, 긴 상세페이지 이미지는 나눠서 업로드한 뒤 다시 시도해주세요.";
+  }
+  if (status === 504 || status === 524 || status === 408) {
+    return "이미지 생성 응답 시간이 초과되었습니다. 잠시 후 다시 시도하거나 업로드 이미지 크기를 줄여주세요.";
+  }
+  return message;
+}
+
+function isTimeoutHtmlError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("<html") ||
+    normalized.includes("inactivity timeout") ||
+    normalized.includes("too much time has passed without sending any data") ||
+    normalized.includes("gateway timeout")
+  );
+}
+
+function shouldFallbackOpenAIQuality(message: string) {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("incorrect api key") ||
+    normalized.includes("invalid_api_key") ||
+    normalized.includes("must be verified") ||
+    normalized.includes("content_policy") ||
+    normalized.includes("invalid image") ||
+    normalized.includes("unsupported")
+  ) {
+    return false;
+  }
+
+  return (
+    isTimeoutHtmlError(message) ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("server_error") ||
+    normalized.includes("temporarily unavailable") ||
+    normalized.includes("overloaded") ||
+    normalized.includes("upstream") ||
+    normalized.includes("openai 응답에 이미지 데이터가 없습니다")
+  );
 }
 
 function sanitizeFileName(name: string) {

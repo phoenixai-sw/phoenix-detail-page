@@ -113,7 +113,7 @@ const phoenixPromoImage = "/phoenix-web-promo.png";
 const models = {
   openai: {
     label: "OpenAI Image 2.0",
-    id: "gpt-image-2-2026-04-21"
+    id: "gpt-image-2"
   },
   google: {
     label: "Google Nano Banana 2",
@@ -664,7 +664,7 @@ export function RedesignWizard() {
       };
       setActiveProject(updatedProject);
       setProjects((current) => [updatedProject, ...current.filter((candidate) => candidate.id !== updatedProject.id)].slice(0, 20));
-      setToast(`${section.name} 편집 완료. 마음에 들면 결과 저장을 눌러주세요.`);
+      setToast(data.warning || `${section.name} 편집 완료. 마음에 들면 결과 저장을 눌러주세요.`);
     } catch (error) {
       reportClientLog("edit-section:error", {
         sectionId,
@@ -946,7 +946,23 @@ function simplifyPlainTextError(text: string, status: number) {
   if (status === 413 || message.toLowerCase().includes("request entity too large")) {
     return "이미지 데이터가 너무 커서 부분 편집 요청을 보낼 수 없습니다. 편집용 이미지를 압축해 다시 시도했지만, 계속 실패하면 해당 섹션을 다시 생성해 주세요.";
   }
+  if (isTimeoutHtmlError(message)) {
+    return "이미지 생성 응답 시간이 초과되었습니다. 업로드 이미지를 더 작게 줄이거나, 긴 상세페이지 이미지는 나눠서 업로드한 뒤 다시 시도해주세요.";
+  }
+  if (status === 504 || status === 524 || status === 408) {
+    return "이미지 생성 응답 시간이 초과되었습니다. 잠시 후 다시 시도하거나 업로드 이미지 크기를 줄여주세요.";
+  }
   return message.slice(0, 500);
+}
+
+function isTimeoutHtmlError(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("<html") ||
+    normalized.includes("inactivity timeout") ||
+    normalized.includes("too much time has passed without sending any data") ||
+    normalized.includes("gateway timeout")
+  );
 }
 
 function reportClientLog(event: string, payload: Record<string, unknown> = {}) {
