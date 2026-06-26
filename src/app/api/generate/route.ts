@@ -11,8 +11,9 @@ const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
 const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
 const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
 const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
-const OPENAI_IMAGE_HIGH_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_HIGH_TIMEOUT_MS || 45000);
-const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBACK_TIMEOUT_MS || 180000);
+const OPENAI_ANALYSIS_TIMEOUT_MS = Number(process.env.OPENAI_ANALYSIS_TIMEOUT_MS || 20000);
+const OPENAI_IMAGE_HIGH_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_HIGH_TIMEOUT_MS || 240000);
+const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBACK_TIMEOUT_MS || 240000);
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 const ANALYSIS_MODEL = process.env.OPENAI_ANALYSIS_MODEL || "gpt-5.5";
 const MAX_REFERENCE_IMAGES = 4;
@@ -252,17 +253,22 @@ async function analyzeWithOpenAI({ apiKey, prompt, references }: { apiKey: strin
     });
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+  const response = await fetchWithTimeout(
+    "https://api.openai.com/v1/responses",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: ANALYSIS_MODEL,
+        input: [{ role: "user", content }]
+      })
     },
-    body: JSON.stringify({
-      model: ANALYSIS_MODEL,
-      input: [{ role: "user", content }]
-    })
-  });
+    OPENAI_ANALYSIS_TIMEOUT_MS,
+    `OpenAI 분석 요청이 ${Math.round(OPENAI_ANALYSIS_TIMEOUT_MS / 1000)}초를 넘었습니다.`
+  );
 
   const data = await readJsonResponse(response);
   if (!response.ok) throw new Error(withRequestId(data?.error?.message || "OpenAI 분석 요청 실패", response));
