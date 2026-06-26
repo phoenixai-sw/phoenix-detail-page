@@ -11,6 +11,8 @@ const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
 const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
 const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
 const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
+const OPENAI_IMAGE_HIGH_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_HIGH_TIMEOUT_MS || 45000);
+const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBACK_TIMEOUT_MS || 180000);
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 const ANALYSIS_MODEL = process.env.OPENAI_ANALYSIS_MODEL || "gpt-5.5";
 const MAX_REFERENCE_IMAGES = 4;
@@ -296,7 +298,13 @@ async function analyzeWithGoogle({ apiKey, prompt, references }: { apiKey: strin
 
 async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }): Promise<GeneratedImage> {
   try {
-    return await generateOpenAIImageWithQuality({ apiKey, prompt, references, quality: OPENAI_IMAGE_QUALITY });
+    return await generateOpenAIImageWithQuality({
+      apiKey,
+      prompt,
+      references,
+      quality: OPENAI_IMAGE_QUALITY,
+      timeoutMs: OPENAI_IMAGE_HIGH_TIMEOUT_MS
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!shouldFallbackOpenAIQuality(message) || OPENAI_IMAGE_QUALITY === OPENAI_IMAGE_FALLBACK_QUALITY) {
@@ -305,7 +313,13 @@ async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: str
 
     const fallbackNotice = `OpenAI Image 2.0 high 품질 응답이 지연되어 모델 설정을 medium 품질로 자동 변경해 생성했습니다.`;
     console.warn(`[generate] OpenAI quality fallback ${OPENAI_IMAGE_QUALITY} -> ${OPENAI_IMAGE_FALLBACK_QUALITY}: ${message}`);
-    const fallbackImage = await generateOpenAIImageWithQuality({ apiKey, prompt, references, quality: OPENAI_IMAGE_FALLBACK_QUALITY });
+    const fallbackImage = await generateOpenAIImageWithQuality({
+      apiKey,
+      prompt,
+      references,
+      quality: OPENAI_IMAGE_FALLBACK_QUALITY,
+      timeoutMs: OPENAI_IMAGE_FALLBACK_TIMEOUT_MS
+    });
     return { ...fallbackImage, fallbackNotice };
   }
 }
@@ -314,12 +328,14 @@ async function generateOpenAIImageWithQuality({
   apiKey,
   prompt,
   references,
-  quality
+  quality,
+  timeoutMs
 }: {
   apiKey: string;
   prompt: string;
   references: ReferenceImage[];
   quality: string;
+  timeoutMs: number;
 }): Promise<GeneratedImage> {
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
@@ -334,11 +350,16 @@ async function generateOpenAIImageWithQuality({
     form.append("image[]", new Blob([new Uint8Array(reference.buffer)], { type: reference.mimeType }), reference.name);
   }
 
-  const response = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form
-  });
+  const response = await fetchWithTimeout(
+    "https://api.openai.com/v1/images/edits",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form
+    },
+    timeoutMs,
+    `OpenAI Image 2.0 ${quality} 품질 요청이 ${Math.round(timeoutMs / 1000)}초를 넘었습니다.`
+  );
 
   const imageBase64 = await readOpenAIImageResponse(response, "OpenAI Image 2.0 생성 실패");
   if (!imageBase64) throw new Error("OpenAI 응답에 이미지 데이터가 없습니다.");
@@ -503,6 +524,20 @@ async function readJsonResponse(response: Response) {
   }
 }
 
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number, timeoutMessage: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isAbortLikeError(error)) throw new Error(timeoutMessage);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function readOpenAIImageResponse(response: Response, fallbackMessage: string) {
   const contentType = response.headers.get("content-type") || "";
   if (!response.ok) {
@@ -615,6 +650,10 @@ function isTimeoutHtmlError(message: string) {
     normalized.includes("too much time has passed without sending any data") ||
     normalized.includes("gateway timeout")
   );
+}
+
+function isAbortLikeError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function shouldFallbackOpenAIQuality(message: string) {

@@ -8,6 +8,8 @@ const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
 const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
 const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
 const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
+const OPENAI_IMAGE_HIGH_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_HIGH_TIMEOUT_MS || 45000);
+const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBACK_TIMEOUT_MS || 180000);
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 
 type Provider = "openai" | "google";
@@ -82,7 +84,13 @@ async function editWithOpenAI({
   image: { mimeType: string; buffer: Buffer };
 }): Promise<EditedImage> {
   try {
-    return await editWithOpenAIQuality({ apiKey, prompt, image, quality: OPENAI_IMAGE_QUALITY });
+    return await editWithOpenAIQuality({
+      apiKey,
+      prompt,
+      image,
+      quality: OPENAI_IMAGE_QUALITY,
+      timeoutMs: OPENAI_IMAGE_HIGH_TIMEOUT_MS
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!shouldFallbackOpenAIQuality(message) || OPENAI_IMAGE_QUALITY === OPENAI_IMAGE_FALLBACK_QUALITY) {
@@ -91,7 +99,13 @@ async function editWithOpenAI({
 
     const fallbackNotice = "OpenAI Image 2.0 high 품질 응답이 지연되어 모델 설정을 medium 품질로 자동 변경해 편집했습니다.";
     console.warn(`[edit-section] OpenAI quality fallback ${OPENAI_IMAGE_QUALITY} -> ${OPENAI_IMAGE_FALLBACK_QUALITY}: ${message}`);
-    const fallbackImage = await editWithOpenAIQuality({ apiKey, prompt, image, quality: OPENAI_IMAGE_FALLBACK_QUALITY });
+    const fallbackImage = await editWithOpenAIQuality({
+      apiKey,
+      prompt,
+      image,
+      quality: OPENAI_IMAGE_FALLBACK_QUALITY,
+      timeoutMs: OPENAI_IMAGE_FALLBACK_TIMEOUT_MS
+    });
     return { ...fallbackImage, fallbackNotice };
   }
 }
@@ -100,12 +114,14 @@ async function editWithOpenAIQuality({
   apiKey,
   prompt,
   image,
-  quality
+  quality,
+  timeoutMs
 }: {
   apiKey: string;
   prompt: string;
   image: { mimeType: string; buffer: Buffer };
   quality: string;
+  timeoutMs: number;
 }): Promise<EditedImage> {
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
@@ -117,11 +133,16 @@ async function editWithOpenAIQuality({
   form.append("partial_images", OPENAI_IMAGE_PARTIAL_IMAGES);
   form.append("image[]", new Blob([new Uint8Array(image.buffer)], { type: image.mimeType }), "section.png");
 
-  const response = await fetch("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form
-  });
+  const response = await fetchWithTimeout(
+    "https://api.openai.com/v1/images/edits",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form
+    },
+    timeoutMs,
+    `OpenAI Image 2.0 ${quality} 품질 요청이 ${Math.round(timeoutMs / 1000)}초를 넘었습니다.`
+  );
 
   const imageBase64 = await readOpenAIImageResponse(response, "OpenAI Image 2.0 섹션 수정 실패");
   if (!imageBase64) throw new Error("OpenAI 응답에 이미지 데이터가 없습니다.");
@@ -178,6 +199,20 @@ async function readJsonResponse(response: Response) {
     return JSON.parse(text);
   } catch {
     return { error: { message: simplifyProviderTextError(text || response.statusText, response.status) } };
+  }
+}
+
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number, timeoutMessage: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isAbortLikeError(error)) throw new Error(timeoutMessage);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -272,6 +307,10 @@ function isTimeoutHtmlError(message: string) {
     normalized.includes("too much time has passed without sending any data") ||
     normalized.includes("gateway timeout")
   );
+}
+
+function isAbortLikeError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function shouldFallbackOpenAIQuality(message: string) {
