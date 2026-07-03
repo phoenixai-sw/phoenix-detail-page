@@ -636,18 +636,14 @@ export function RedesignWizard() {
         sectionId,
         imageBytes: estimateDataUrlBytes(requestImageUrl)
       });
-      const response = await fetch("/api/edit-section", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          imageUrl: requestImageUrl,
-          request: trimmedEditRequest,
-          section,
-          project: { title: projectDisplayTitle(project), channel: project.channel, request: project.request },
-          openaiKey,
-          googleKey
-        }),
+      const response = await fetchEditSection({
+        model,
+        imageUrl: requestImageUrl,
+        request: trimmedEditRequest,
+        section: sectionRequestPayload(section),
+        project: { title: projectDisplayTitle(project), channel: project.channel, request: project.request },
+        openaiKey,
+        googleKey,
         signal: abortController.signal
       });
       const data = await readApiResponse(response);
@@ -677,6 +673,43 @@ export function RedesignWizard() {
       setEditingSectionId(null);
       setGenerating(false);
     }
+  }
+
+  async function fetchEditSection({
+    model,
+    imageUrl,
+    request,
+    section,
+    project,
+    openaiKey,
+    googleKey,
+    signal
+  }: {
+    model: Model;
+    imageUrl: string;
+    request: string;
+    section: Pick<SectionResult, "id" | "name" | "purpose" | "source" | "prompt">;
+    project: { title: string; channel: string; request: string };
+    openaiKey: string;
+    googleKey: string;
+    signal: AbortSignal;
+  }) {
+    const form = new FormData();
+    const imageBlob = dataUrlToBlob(imageUrl);
+    form.append("model", model);
+    form.append("image", imageBlob, "section.jpg");
+    form.append("request", request);
+    form.append("section", JSON.stringify(section));
+    form.append("project", JSON.stringify(project));
+    form.append("openaiKey", openaiKey);
+    form.append("googleKey", googleKey);
+
+    return fetch("/api/edit-section", {
+        method: "POST",
+        body: form,
+        signal
+      }
+    );
   }
 
   function cancelGeneration() {
@@ -1118,23 +1151,56 @@ async function compressImageForRequest(dataUrl: string) {
 
   try {
     const image = await loadDataUrlImage(dataUrl);
-    const maxWidth = 960;
-    const scale = Math.min(1, maxWidth / Math.max(1, image.naturalWidth));
-    const width = Math.max(1, Math.round(image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) return dataUrl;
+    const maxBytes = 650 * 1024;
+    const attempts = [
+      { maxWidth: 900, quality: 0.78 },
+      { maxWidth: 760, quality: 0.72 },
+      { maxWidth: 640, quality: 0.68 },
+      { maxWidth: 520, quality: 0.62 }
+    ];
 
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
-    return await canvasToDataUrl(canvas, "image/jpeg", 0.84);
+    let bestDataUrl = dataUrl;
+    let bestBytes = estimateDataUrlBytes(dataUrl);
+    for (const attempt of attempts) {
+      const nextDataUrl = await resizeImageToJpeg(image, attempt.maxWidth, attempt.quality);
+      const nextBytes = estimateDataUrlBytes(nextDataUrl);
+      if (nextBytes < bestBytes) {
+        bestDataUrl = nextDataUrl;
+        bestBytes = nextBytes;
+      }
+      if (nextBytes <= maxBytes) return nextDataUrl;
+    }
+
+    return bestDataUrl;
   } catch {
     return dataUrl;
   }
+}
+
+async function resizeImageToJpeg(image: HTMLImageElement, maxWidth: number, quality: number) {
+  const scale = Math.min(1, maxWidth / Math.max(1, image.naturalWidth));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("수정용 이미지를 압축하지 못했습니다.");
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  return canvasToDataUrl(canvas, "image/jpeg", quality);
+}
+
+function sectionRequestPayload(section: SectionResult) {
+  return {
+    id: section.id,
+    name: section.name,
+    purpose: section.purpose,
+    source: section.source,
+    prompt: section.prompt
+  };
 }
 
 function loadDataUrlImage(dataUrl: string) {
@@ -1163,6 +1229,17 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(reader.error || new Error("이미지 변환에 실패했습니다."));
     reader.readAsDataURL(blob);
   });
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [header, payload = ""] = dataUrl.split(",");
+  const mime = header.match(/^data:([^;]+)/)?.[1] || "image/jpeg";
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime });
 }
 
 function estimateDataUrlBytes(dataUrl: string) {

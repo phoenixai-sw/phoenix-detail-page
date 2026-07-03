@@ -13,54 +13,50 @@ const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBAC
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 
 type Provider = "openai" | "google";
+
 type EditedImage = {
   mimeType: string;
   buffer: Buffer;
   fallbackNotice?: string;
 };
 
+type EditRequestPayload = {
+  provider: Provider;
+  image: { mimeType: string; buffer: Buffer } | null;
+  requestText: string;
+  section: Record<string, unknown>;
+  project: Record<string, unknown>;
+  openaiKey: string;
+  googleKey: string;
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const provider: Provider = body.model === "google" ? "google" : "openai";
-    const image = parseDataUrl(String(body.imageUrl || ""));
-    const requestText = String(body.request || "");
-    const section = body.section || {};
-    const project = body.project || {};
-    const openaiKey = String(body.openaiKey || "");
-    const googleKey = String(body.googleKey || "");
-    const apiKey = provider === "google" ? googleKey : openaiKey;
+    const payload = await parseEditRequest(request);
+    const apiKey = payload.provider === "google" ? payload.googleKey : payload.openaiKey;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: provider === "google" ? "Google Nano Banana 2 API 키가 필요합니다." : "OpenAI Image 2.0 API 키가 필요합니다." },
+        { error: payload.provider === "google" ? "Google Nano Banana 2 API 키가 필요합니다." : "OpenAI Image 2.0 API 키가 필요합니다." },
         { status: 400 }
       );
     }
-    if (!image) {
+    if (!payload.image) {
       return NextResponse.json({ error: "수정할 섹션 이미지가 없습니다." }, { status: 400 });
     }
-    if (!requestText.trim()) {
+    if (!payload.requestText.trim()) {
       return NextResponse.json({ error: "섹션 수정 요청사항을 입력해주세요." }, { status: 400 });
     }
 
-    const prompt = [
-      "너는 커머스 상세페이지 섹션 이미지 편집 엔진이다.",
-      "첨부된 9:16 상세페이지 섹션 이미지를 기반으로 전체 톤과 제품 맥락은 유지하되, 사용자가 요청한 부분만 자연스럽게 편집한다.",
-      `프로젝트: ${project.title || "상세페이지 리디자인"}`,
-      `판매 채널: ${project.channel || "스마트스토어"}`,
-      `섹션: ${section.id || ""} ${section.name || ""}`,
-      `섹션 목적: ${section.purpose || ""}`,
-      `원본 참조: ${section.source || ""}`,
-      `사용자 수정 요청: ${requestText}`,
-      "브랜드명 금지 규칙: 'phoenix detail page', 'Phoenix Detail Page', 'PHOENIX DETAIL PAGE', 'PD'는 서비스명 또는 도구명일 뿐이며 제품 브랜드가 아니다. 이 단어들을 이미지 안의 제품명, 브랜드명, 로고, 라벨, 헤드라인, 후기, FAQ, CTA, 패키지 텍스트로 절대 사용하지 않는다.",
-      "브랜드 사용 규칙: 제품 브랜드명과 제품명은 첨부 이미지 또는 프로젝트 원본에서 확인되는 이름만 사용한다. 확인되지 않는 새 브랜드명, 새 제품명, 새 로고를 만들지 않는다.",
-      "편집 규칙: 제품명, 패키지, 핵심 수치, 안전 표현, 원본의 중요한 정보는 유지한다. 근거 없는 성능, 리뷰, 인증, 수치를 새로 만들지 않는다. 한국어 문구는 짧고 명확하게 정리하고, 작은 글씨는 줄인다."
-    ].join("\n");
+    const prompt = buildEditPrompt({
+      project: payload.project,
+      section: payload.section,
+      requestText: payload.requestText
+    });
 
-    const edited = provider === "google"
-      ? await editWithGoogle({ apiKey, prompt, image })
-      : await editWithOpenAI({ apiKey, prompt, image });
+    const edited = payload.provider === "google"
+      ? await editWithGoogle({ apiKey, prompt, image: payload.image })
+      : await editWithOpenAI({ apiKey, prompt, image: payload.image });
 
     return NextResponse.json({
       imageUrl: `data:${edited.mimeType};base64,${edited.buffer.toString("base64")}`,
@@ -70,8 +66,79 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[api/edit-section]", error);
-    return NextResponse.json({ error: error instanceof Error ? humanizeProviderError(error.message) : "섹션 수정 중 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? humanizeProviderError(error.message) : "섹션 수정 중 오류가 발생했습니다." },
+      { status: 500 }
+    );
   }
+}
+
+async function parseEditRequest(request: NextRequest): Promise<EditRequestPayload> {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const imageFile = form.get("image");
+    const image = imageFile instanceof File
+      ? {
+          mimeType: imageFile.type || "image/jpeg",
+          buffer: Buffer.from(await imageFile.arrayBuffer())
+        }
+      : null;
+
+    return {
+      provider: String(form.get("model") || "openai") === "google" ? "google" : "openai",
+      image,
+      requestText: String(form.get("request") || ""),
+      section: parseJsonField(form.get("section")),
+      project: parseJsonField(form.get("project")),
+      openaiKey: String(form.get("openaiKey") || ""),
+      googleKey: String(form.get("googleKey") || "")
+    };
+  }
+
+  const body = await request.json();
+  return {
+    provider: body.model === "google" ? "google" : "openai",
+    image: parseDataUrl(String(body.imageUrl || "")),
+    requestText: String(body.request || ""),
+    section: body.section || {},
+    project: body.project || {},
+    openaiKey: String(body.openaiKey || ""),
+    googleKey: String(body.googleKey || "")
+  };
+}
+
+function parseJsonField(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function buildEditPrompt({
+  project,
+  section,
+  requestText
+}: {
+  project: Record<string, unknown>;
+  section: Record<string, unknown>;
+  requestText: string;
+}) {
+  return [
+    "너는 커머스 상세페이지 섹션 이미지 편집 디렉터다.",
+    "첨부된 9:16 상세페이지 섹션 이미지를 기반으로 전체 톤과 제품 맥락은 유지하되, 유저가 요청한 부분만 자연스럽게 편집한다.",
+    `프로젝트: ${String(project.title || "상세페이지 리디자인")}`,
+    `판매 채널: ${String(project.channel || "스마트스토어")}`,
+    `섹션: ${String(section.id || "")} ${String(section.name || "")}`,
+    `섹션 목적: ${String(section.purpose || "")}`,
+    `원본 참조: ${String(section.source || "")}`,
+    `유저 수정 요청: ${requestText}`,
+    "브랜드명 금지 규칙: 'phoenix detail page', 'Phoenix Detail Page', 'PHOENIX DETAIL PAGE', 'PD'는 서비스명 또는 도구명일 뿐 제품 브랜드가 아니다. 이 단어들을 이미지 안의 제품명, 브랜드명, 로고, 라벨, 헤드라인, 후기, FAQ, CTA, 패키지 텍스트로 사용하지 않는다.",
+    "브랜드 사용 규칙: 제품 브랜드명과 제품명은 첨부 이미지 또는 프로젝트 원본에서 확인되는 이름만 사용한다. 확인되지 않는 새 브랜드명, 새 제품명, 새 로고를 만들지 않는다.",
+    "편집 규칙: 제품명, 패키지, 핵심 수치, 안전 표현, 원본의 중요한 정보는 유지한다. 근거 없는 성능, 리뷰, 인증, 수치를 새로 만들지 않는다. 한국어 문구는 짧고 명확하게 정리하고, 작은 글씨는 줄인다."
+  ].join("\n");
 }
 
 async function editWithOpenAI({
@@ -97,7 +164,7 @@ async function editWithOpenAI({
       throw error;
     }
 
-    const fallbackNotice = "OpenAI Image 2.0 high 품질 응답이 지연되어 모델 설정을 medium 품질로 자동 변경해 편집했습니다.";
+    const fallbackNotice = "OpenAI Image 2.0 high 품질 응답이 지연되어 medium 품질로 자동 변경해 편집했습니다.";
     console.warn(`[edit-section] OpenAI quality fallback ${OPENAI_IMAGE_QUALITY} -> ${OPENAI_IMAGE_FALLBACK_QUALITY}: ${message}`);
     const fallbackImage = await editWithOpenAIQuality({
       apiKey,
@@ -131,7 +198,7 @@ async function editWithOpenAIQuality({
   form.append("output_format", "png");
   form.append("stream", "true");
   form.append("partial_images", OPENAI_IMAGE_PARTIAL_IMAGES);
-  form.append("image[]", new Blob([new Uint8Array(image.buffer)], { type: image.mimeType }), "section.png");
+  form.append("image[]", new Blob([new Uint8Array(image.buffer)], { type: image.mimeType }), "section.jpg");
 
   const response = await fetchWithTimeout(
     "https://api.openai.com/v1/images/edits",
