@@ -2004,7 +2004,13 @@ function SectionResultCard({
           presetLabel: label,
           presetText: text,
           projectTitle,
-          section
+          section: {
+            id: section.id,
+            name: section.name,
+            purpose: section.purpose,
+            source: section.source,
+            prompt: section.prompt
+          }
         })
       });
       const data = await readApiResponse(response);
