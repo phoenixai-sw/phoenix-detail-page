@@ -787,6 +787,7 @@ export function RedesignWizard() {
         {view === "results" && (
           <Results
             project={currentProject}
+            openaiKey={openaiKey}
             rolloutRequest={rolloutRequest}
             setRolloutRequest={setRolloutRequest}
             onToast={setToast}
@@ -1833,6 +1834,7 @@ function ChannelOptionGroup({ value, onChange }: { value: string; onChange: (val
 
 function Results({
   project,
+  openaiKey,
   rolloutRequest,
   setRolloutRequest,
   onToast,
@@ -1843,6 +1845,7 @@ function Results({
   editingSectionId
 }: {
   project?: Project | null;
+  openaiKey: string;
   rolloutRequest: string;
   setRolloutRequest: (request: string) => void;
   onToast: (message: string) => void;
@@ -1897,6 +1900,8 @@ function Results({
                 section={section}
                 index={index}
                 projectTitle={title}
+                openaiKey={openaiKey}
+                onToast={onToast}
                 onEditSection={onEditSection}
                 editing={editingSectionId === section.id}
                 disabled={generating}
@@ -1951,6 +1956,8 @@ function SectionResultCard({
   section,
   index,
   projectTitle,
+  openaiKey,
+  onToast,
   onEditSection,
   editing,
   disabled
@@ -1958,12 +1965,15 @@ function SectionResultCard({
   section: SectionResult;
   index: number;
   projectTitle: string;
+  openaiKey: string;
+  onToast: (message: string) => void;
   onEditSection: (sectionId: string, editRequest: string, model: Model) => void;
   editing: boolean;
   disabled: boolean;
 }) {
   const [editRequest, setEditRequest] = React.useState("");
   const [editModel, setEditModel] = React.useState<Model>("openai");
+  const [aiCommentPreset, setAiCommentPreset] = React.useState("");
   const revisions = React.useMemo(() => ensureSectionRevisions(section), [section]);
   const currentIndex = Math.max(0, revisions.findIndex((revision) => revision.imageUrl === section.imageUrl));
   const [revisionIndex, setRevisionIndex] = React.useState(currentIndex);
@@ -1975,6 +1985,37 @@ function SectionResultCard({
 
   function addPreset(text: string) {
     setEditRequest((current) => current ? `${current}\n${text}` : text);
+  }
+
+  async function generateAiComment(label: string, text: string) {
+    const trimmedKey = openaiKey.trim();
+    if (!trimmedKey) {
+      onToast("OpenAI API 키를 먼저 설정해주세요.");
+      return;
+    }
+
+    setAiCommentPreset(label);
+    try {
+      const response = await fetch("/api/ai-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openaiKey: trimmedKey,
+          presetLabel: label,
+          presetText: text,
+          projectTitle,
+          section
+        })
+      });
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.error || "AI 멘트 생성에 실패했습니다.");
+      addPreset(String(data.comment || "").trim());
+      onToast(`${label} AI 멘트를 추가했습니다.`);
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "AI 멘트 생성 중 오류가 발생했습니다.");
+    } finally {
+      setAiCommentPreset("");
+    }
   }
 
   function moveRevision(step: number) {
@@ -2057,11 +2098,25 @@ function SectionResultCard({
             placeholder="예: 이 이미지는 헤드라인을 줄이고, 제품 이미지를 오른쪽으로 옮겨 다른 섹션과 덜 반복되게 해주세요."
             className="min-h-20 text-xs"
           />
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid gap-1.5">
             {quickEditPresets.map(([label, text]) => (
-              <Button key={label} type="button" variant="secondary" size="sm" onClick={() => addPreset(text)}>
-                {label}
-              </Button>
+              <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
+                <Button type="button" variant="secondary" size="sm" className="justify-start px-2" onClick={() => addPreset(text)}>
+                  {label}
+                </Button>
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="sm"
+                  className="px-2"
+                  onClick={() => generateAiComment(label, text)}
+                  disabled={disabled || Boolean(aiCommentPreset)}
+                  title={`${label} AI 멘트 생성`}
+                >
+                  {aiCommentPreset === label ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  AI 멘트 생성
+                </Button>
+              </div>
             ))}
           </div>
           <OptionGroup
