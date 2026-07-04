@@ -125,6 +125,27 @@ const models = {
   }
 };
 
+const ratioOptions = [
+  {
+    value: "9:16",
+    label: "9:16(상세)",
+    title: "상세페이지 생성 기본값",
+    description: "모바일 상세페이지 본문, 스마트스토어/쿠팡/자사몰 섹션처럼 위에서 아래로 읽는 긴 정보 흐름에 최적입니다."
+  },
+  {
+    value: "1:1",
+    label: "1:1(정사각)",
+    title: "썸네일/카드뉴스/보조 이미지",
+    description: "상품 보조컷, SNS 카드뉴스, 광고 썸네일처럼 제품과 짧은 혜택 문구를 안정적으로 보여줄 때 적합합니다."
+  },
+  {
+    value: "4:5",
+    label: "4:5(피드)",
+    title: "광고/SNS 피드 소재",
+    description: "인스타그램·메타 광고, 모바일 피드형 소재처럼 1:1보다 조금 더 여유 있는 세로 카드에 적합합니다."
+  }
+];
+
 const baseSections = [
   ["S1 히어로", "3초 안에 제품, 타겟, 핵심 약속, CTA를 전달합니다.", "제품컷, 대표 USP"],
   ["S2 문제 공감", "고객이 자기 상황이라고 느끼는 체크리스트를 배치합니다.", "사용 전 고민 문구"],
@@ -166,7 +187,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     channel: overrides.channel || "스마트스토어",
     model,
     count,
-    ratio: "9:16",
+    ratio: overrides.ratio || "9:16",
     status: overrides.status || "완료",
     files: overrides.files || ["original-detail.pdf"],
     request: overrides.request || "전환율 중심으로 리디자인",
@@ -184,7 +205,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
           "",
           `section: ${name}`,
           `purpose: ${purpose}`,
-          "9:16 세로형 상세페이지 섹션. 원본 제품컷과 핵심 USP를 보존하고 구매전환 중심으로 리디자인."
+          `${ratioDisplayLabel(overrides.ratio || "9:16")} 상세페이지 섹션. 원본 제품컷과 핵심 USP를 보존하고 구매전환 중심으로 리디자인.`
         ].join("<br>")
       }))
   };
@@ -425,14 +446,16 @@ export function RedesignWizard() {
       const project: Project = {
         ...data.project,
         title: projectDisplayTitle(data.project),
-        sections: data.project.sections.map((section: Record<string, string>) => ({
-          id: section.section_id,
-          name: section.name,
-          purpose: section.purpose,
-          source: section.source,
-          prompt: section.prompt,
-          imageUrl: section.imageUrl
-        }))
+        sections: await Promise.all(
+          data.project.sections.map(async (section: Record<string, string>) => ({
+            id: section.section_id,
+            name: section.name,
+            purpose: section.purpose,
+            source: section.source,
+            prompt: section.prompt,
+            imageUrl: await normalizeImageToRatio(section.imageUrl, ratio)
+          }))
+        )
       };
       const finalProject = baseProject ? mergeGeneratedProject(baseProject, project) : project;
       const nextProjects = [finalProject, ...projects].filter((candidate, index, list) => (
@@ -670,7 +693,7 @@ export function RedesignWizard() {
         imageUrl: requestImageUrl,
         request: trimmedEditRequest,
         section: sectionRequestPayload(section),
-        project: { title: projectDisplayTitle(project), channel: project.channel, request: project.request },
+        project: { title: projectDisplayTitle(project), channel: project.channel, request: project.request, ratio: project.ratio },
         openaiKey,
         googleKey,
         signal: abortController.signal
@@ -678,11 +701,12 @@ export function RedesignWizard() {
       const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.error || "섹션 수정 실패");
 
+      const nextImageUrl = await normalizeImageToRatio(data.imageUrl, project.ratio);
       const updatedProject: Project = {
         ...project,
         sections: project.sections.map((candidate) => (
           candidate.id === sectionId
-            ? addSectionRevision(candidate, data.imageUrl, data.prompt || candidate.prompt, trimmedEditRequest, model)
+            ? addSectionRevision(candidate, nextImageUrl, data.prompt || candidate.prompt, trimmedEditRequest, model)
             : candidate
         )),
         status: project.savedAt ? "수정됨" : project.status
@@ -718,7 +742,7 @@ export function RedesignWizard() {
     imageUrl: string;
     request: string;
     section: Pick<SectionResult, "id" | "name" | "purpose" | "source" | "prompt">;
-    project: { title: string; channel: string; request: string };
+    project: { title: string; channel: string; request: string; ratio: string };
     openaiKey: string;
     googleKey: string;
     signal: AbortSignal;
@@ -1208,6 +1232,16 @@ function imageExtension(url: string) {
   return "png";
 }
 
+function ratioDisplayLabel(value?: string) {
+  return ratioOptions.find((option) => option.value === value)?.label || value || "9:16(상세)";
+}
+
+function ratioAspectValue(value?: string) {
+  if (value === "1:1") return "1 / 1";
+  if (value === "4:5") return "4 / 5";
+  return "9 / 16";
+}
+
 function sanitizeDownloadName(name: string) {
   return name
     .replace(/[\\/:*?"<>|]+/g, "-")
@@ -1262,6 +1296,49 @@ async function resizeImageToJpeg(image: HTMLImageElement, maxWidth: number, qual
   context.fillRect(0, 0, width, height);
   context.drawImage(image, 0, 0, width, height);
   return canvasToDataUrl(canvas, "image/jpeg", quality);
+}
+
+async function normalizeImageToRatio(dataUrl: string, ratio: string) {
+  if (!dataUrl?.startsWith("data:image/")) return dataUrl;
+
+  try {
+    const image = await loadDataUrlImage(dataUrl);
+    const targetRatio = ratioNumber(ratio);
+    const sourceRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = image.naturalWidth;
+    let sourceHeight = image.naturalHeight;
+
+    if (sourceRatio > targetRatio) {
+      sourceWidth = Math.round(image.naturalHeight * targetRatio);
+      sourceX = Math.round((image.naturalWidth - sourceWidth) / 2);
+    } else if (sourceRatio < targetRatio) {
+      sourceHeight = Math.round(image.naturalWidth / targetRatio);
+      sourceY = Math.round((image.naturalHeight - sourceHeight) / 2);
+    }
+
+    const outputWidth = 1080;
+    const outputHeight = ratio === "1:1" ? 1080 : ratio === "4:5" ? 1350 : 1920;
+    const canvas = document.createElement("canvas");
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return dataUrl;
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, outputWidth, outputHeight);
+    context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputWidth, outputHeight);
+    return canvasToDataUrl(canvas, "image/jpeg", 0.92);
+  } catch {
+    return dataUrl;
+  }
+}
+
+function ratioNumber(ratio: string) {
+  if (ratio === "1:1") return 1;
+  if (ratio === "4:5") return 4 / 5;
+  return 9 / 16;
 }
 
 function sectionRequestPayload(section: SectionResult) {
@@ -1675,7 +1752,7 @@ function Dashboard({
                     <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
                       <span>{project.channel}</span>
                       <span>{project.count}장</span>
-                      <span>{project.ratio}</span>
+                      <span>{ratioDisplayLabel(project.ratio)}</span>
                       <span>{models[project.model].label}</span>
                     </div>
                   </div>
@@ -1756,7 +1833,7 @@ function Dashboard({
             <CardContent className="grid grid-cols-3 gap-3">
               <Stat label="최근" value={String(projects.length)} sub="작업" />
               <Stat label="평균" value={averageImageCount} sub="이미지 장수" />
-              <Stat label="기본" value="9:16" sub="출력 비율" />
+              <Stat label="기본" value="9:16" sub="상세 비율" />
             </CardContent>
           </Card>
           <Card>
@@ -1971,7 +2048,7 @@ function Workspace(props: {
             </CardHeader>
             <CardContent className="grid gap-4">
               <OptionGroup label="생성 페이지" value={String(count)} options={[["1", "1장(히어로)"], ["4", "4장(심플)"], ["8", "8장(상세)"]]} onChange={(value) => setCount(Number(value))} />
-              <OptionGroup label="출력 비율" value={ratio} options={[["9:16", "9:16"], ["1080×1920", "1080×1920"]]} onChange={setRatio} />
+              <RatioOptionGroup value={ratio} onChange={setRatio} />
               <ChannelOptionGroup value={channel} onChange={setChannel} />
             </CardContent>
           </Card>
@@ -2137,6 +2214,7 @@ function Results({
                 section={section}
                 index={index}
                 projectTitle={title}
+                ratio={project.ratio}
                 openaiKey={openaiKey}
                 onToast={onToast}
                 onEditSection={onEditSection}
@@ -2193,6 +2271,7 @@ function SectionResultCard({
   section,
   index,
   projectTitle,
+  ratio,
   openaiKey,
   onToast,
   onEditSection,
@@ -2202,6 +2281,7 @@ function SectionResultCard({
   section: SectionResult;
   index: number;
   projectTitle: string;
+  ratio: string;
   openaiKey: string;
   onToast: (message: string) => void;
   onEditSection: (sectionId: string, editRequest: string, model: Model) => void;
@@ -2268,7 +2348,7 @@ function SectionResultCard({
 
   return (
     <Card className="overflow-hidden shadow-none">
-      <div className="relative aspect-[9/16] border-b border-border bg-muted">
+      <div className="relative border-b border-border bg-muted" style={{ aspectRatio: ratioAspectValue(ratio) }}>
         {activeRevision?.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={activeRevision.imageUrl} alt={`${section.name} ${activeRevision.label}`} className="h-full w-full object-cover" />
@@ -2551,6 +2631,40 @@ function OptionGroup({
             {optionLabel}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function RatioOptionGroup({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-bold text-muted-foreground">출력 비율</label>
+      <div className="grid gap-2">
+        {ratioOptions.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={cn(
+                "rounded-md border border-border bg-white p-3 text-left transition hover:border-[#ff9f7a] hover:bg-[#fff8f5]",
+                selected && "border-[#101726] bg-[#101726] text-white shadow-sm"
+              )}
+              onClick={() => onChange(option.value)}
+            >
+              <span className="flex items-center justify-between gap-3">
+                <strong className="text-sm">{option.label}</strong>
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-black", selected ? "bg-[#ffd36a] text-[#101726]" : "bg-[#fff3ee] text-[#0f766e]")}>
+                  {option.title}
+                </span>
+              </span>
+              <span className={cn("mt-1 block text-[11px] leading-relaxed", selected ? "text-white/78" : "text-muted-foreground")}>
+                {option.description}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         console.info(`[generate] ${provider} ${section.section_id} start (${index + 1}/${sections.length})`);
         const image = provider === "google"
           ? await generateGoogleImage({ apiKey, prompt: section.promptText, references })
-          : await generateOpenAIImage({ apiKey, prompt: section.promptText, references });
+          : await generateOpenAIImage({ apiKey, prompt: section.promptText, references, ratio });
 
         generatedSections.push({
           ...section,
@@ -302,12 +302,13 @@ async function analyzeWithGoogle({ apiKey, prompt, references }: { apiKey: strin
   return parseMaybeJson(text);
 }
 
-async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: string; prompt: string; references: ReferenceImage[] }): Promise<GeneratedImage> {
+async function generateOpenAIImage({ apiKey, prompt, references, ratio }: { apiKey: string; prompt: string; references: ReferenceImage[]; ratio: string }): Promise<GeneratedImage> {
   try {
     return await generateOpenAIImageWithQuality({
       apiKey,
       prompt,
       references,
+      ratio,
       quality: OPENAI_IMAGE_QUALITY,
       timeoutMs: OPENAI_IMAGE_HIGH_TIMEOUT_MS
     });
@@ -323,6 +324,7 @@ async function generateOpenAIImage({ apiKey, prompt, references }: { apiKey: str
       apiKey,
       prompt,
       references,
+      ratio,
       quality: OPENAI_IMAGE_FALLBACK_QUALITY,
       timeoutMs: OPENAI_IMAGE_FALLBACK_TIMEOUT_MS
     });
@@ -334,19 +336,21 @@ async function generateOpenAIImageWithQuality({
   apiKey,
   prompt,
   references,
+  ratio,
   quality,
   timeoutMs
 }: {
   apiKey: string;
   prompt: string;
   references: ReferenceImage[];
+  ratio: string;
   quality: string;
   timeoutMs: number;
 }): Promise<GeneratedImage> {
   const form = new FormData();
   form.append("model", OPENAI_IMAGE_MODEL);
   form.append("prompt", prompt);
-  form.append("size", OPENAI_IMAGE_SIZE);
+  form.append("size", openAIImageSizeForRatio(ratio));
   form.append("quality", quality);
   form.append("output_format", "png");
   form.append("stream", "true");
@@ -411,13 +415,14 @@ function buildSections(
 ): Section[] {
   return sectionTemplates(count, startSection).map((template) => {
     const sectionNumber = Number(template.id.replace(/\D/g, ""));
+    const ratioInstruction = ratioPromptInstruction(payload.options.ratio);
     const modelPlacementRule = sectionNumber % 2 === 1
       ? "모델/인물 이미지 규칙: 이 섹션은 홀수 페이지이므로 요청에 모델, 인물, 착용컷, 사용자가 포함되면 1명 이하로 자연스럽게 배치할 수 있다. 단 같은 위치와 같은 포즈를 반복하지 않는다."
       : "모델/인물 이미지 규칙: 이 섹션은 짝수 페이지이므로 모델, 인물, 얼굴, 전신, 착용컷, 손 모델을 새로 넣지 않는다. 제품컷, 아이콘, 표, 카드, 루틴, FAQ, 근거 자료 중심으로 구성한다.";
     const promptText = [
       "너는 커머스 상세페이지 리디자인 이미지 생성 엔진이다.",
       `이미지 생성 모델: ${modelInfo.label} (${modelInfo.id})`,
-      "세로형 9:16 상세페이지 섹션 이미지 1장을 생성한다.",
+      ratioInstruction,
       `섹션: ${template.name}`,
       `목적: ${template.purpose}`,
       `원본 참조: ${template.source}`,
@@ -525,6 +530,21 @@ function modelMeta(provider: Provider) {
     return { provider: "google" as const, label: "Google Nano Banana 2", id: GOOGLE_NANO_BANANA_2_MODEL };
   }
   return { provider: "openai" as const, label: "OpenAI Image 2.0", id: OPENAI_IMAGE_MODEL };
+}
+
+function openAIImageSizeForRatio(ratio: string) {
+  if (ratio === "1:1") return "1024x1024";
+  return OPENAI_IMAGE_SIZE;
+}
+
+function ratioPromptInstruction(ratio: string) {
+  if (ratio === "1:1") {
+    return "1:1 정사각형 이미지 1장을 생성한다. 썸네일, 카드뉴스, 보조 이미지에 맞게 제품과 핵심 혜택 1개가 중앙에서 빠르게 읽히도록 구성한다.";
+  }
+  if (ratio === "4:5") {
+    return "4:5 세로 피드형 이미지 1장을 생성한다. 광고/SNS 피드 소재에 맞게 제품 이미지와 짧은 카피를 여유 있게 배치하고, 9:16 상세페이지처럼 너무 길게 만들지 않는다.";
+  }
+  return "9:16 세로형 상세페이지 섹션 이미지 1장을 생성한다. 모바일 상세페이지 본문에 맞게 위에서 아래로 읽히는 정보 흐름을 구성한다.";
 }
 
 async function readJsonResponse(response: Response) {
