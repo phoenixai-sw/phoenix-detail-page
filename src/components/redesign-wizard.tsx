@@ -346,8 +346,12 @@ export function RedesignWizard() {
   ): Promise<Project | null> {
     const outputCount = typeof nextCount === "number" && Number.isFinite(nextCount) ? nextCount : count;
     const outputRolloutRequest = typeof nextRolloutRequest === "string" ? nextRolloutRequest : "";
+    const hasSavedReferenceImages = Boolean(baseProject?.sections.some((section) => section.imageUrl));
+    const effectiveRatio = baseProject?.ratio || ratio;
+    const effectiveChannel = baseProject?.channel || channel;
+    const effectiveRequest = baseProject?.request || request;
 
-    if (files.length === 0) {
+    if (files.length === 0 && !hasSavedReferenceImages) {
       setToast("기존 상세페이지 이미지 또는 PDF를 먼저 업로드해주세요.");
       setView("workspace");
       return null;
@@ -384,7 +388,7 @@ export function RedesignWizard() {
       model: selectedModel,
       count: outputCount,
       startSection,
-      files: files.length,
+      files: files.length || baseProject?.sections.filter((section) => section.imageUrl).length || 0,
       append: Boolean(baseProject)
     });
     setGenerationPlan({
@@ -402,9 +406,15 @@ export function RedesignWizard() {
 
     try {
       const form = new FormData();
-      const uploadFiles = await normalizeFilesForUpload(files);
+      const uploadFiles = files.length > 0
+        ? await normalizeFilesForUpload(files)
+        : await projectImagesToReferenceFiles(baseProject);
+      if (uploadFiles.length === 0) {
+        setToast("추가 생성에 사용할 원본 자료나 기존 결과 이미지가 없습니다.");
+        return null;
+      }
       if (abortController.signal.aborted) throw new DOMException("생성 요청을 취소했습니다.", "AbortError");
-      setToast("원본 분석과 실제 이미지 생성을 시작합니다.");
+      setToast(files.length > 0 ? "원본 분석과 실제 이미지 생성을 시작합니다." : "기존 결과 이미지를 참고해 추가 생성을 시작합니다.");
       const knowledgeText = useSharedKnowledge
         ? knowledgeItems
             .map((item, index) => `# 맞춤형 Data 설정 ${index + 1}: ${item.name}\n${item.text}`)
@@ -415,10 +425,10 @@ export function RedesignWizard() {
       form.append("knowledgeText", knowledgeText);
       form.append("useKnowledge", String(useSharedKnowledge));
       form.append("knowledgeAccessKey", knowledgeAccessKey);
-      form.append("request", request);
+      form.append("request", effectiveRequest);
       form.append("model", selectedModel);
-      form.append("channel", channel);
-      form.append("ratio", ratio);
+      form.append("channel", effectiveChannel);
+      form.append("ratio", effectiveRatio);
       form.append("count", String(outputCount));
       form.append("startSection", String(startSection));
       form.append("rolloutRequest", outputRolloutRequest);
@@ -454,7 +464,7 @@ export function RedesignWizard() {
             purpose: section.purpose,
             source: section.source,
             prompt: section.prompt,
-            imageUrl: await normalizeImageToRatio(section.imageUrl, ratio)
+            imageUrl: await normalizeImageToRatio(section.imageUrl, effectiveRatio)
           }))
         )
       };
@@ -1580,6 +1590,20 @@ async function normalizeFilesForUpload(files: File[]) {
     }
   }
   return output.slice(0, 4);
+}
+
+async function projectImagesToReferenceFiles(project?: Project | null) {
+  const sections = (project?.sections || [])
+    .filter((section) => section.imageUrl)
+    .slice(-4);
+
+  const output: File[] = [];
+  for (const [index, section] of sections.entries()) {
+    const blob = await imageUrlToBlob(section.imageUrl || "");
+    output.push(new File([blob], `${section.id || `section-${index + 1}`}.jpg`, { type: blob.type || "image/jpeg" }));
+  }
+
+  return output;
 }
 
 async function renderImageToReferenceFiles(file: File) {
