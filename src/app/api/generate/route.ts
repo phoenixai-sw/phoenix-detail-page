@@ -235,7 +235,7 @@ async function analyzeSource({
     return await analyzeWithOpenAI({ apiKey, prompt, references });
   } catch (error) {
     return {
-      product_inferred: { category: "업로드 자료 기반 추정", confidence: 0.4 },
+      product_inferred: { category: "업로드 자료 기반", confidence: 0.4 },
       diagnostic_summary: `AI 분석 호출 실패: ${error instanceof Error ? error.message : "unknown"}`,
       strategy: "원본 자료의 제품컷/USP/근거를 보존하고, 6~8장 섹션 구조로 전환 설계를 적용합니다.",
       page_blueprint: [],
@@ -410,6 +410,10 @@ function buildSections(
   modelInfo: ReturnType<typeof modelMeta>
 ): Section[] {
   return sectionTemplates(count, startSection).map((template) => {
+    const sectionNumber = Number(template.id.replace(/\D/g, ""));
+    const modelPlacementRule = sectionNumber % 2 === 1
+      ? "모델/인물 이미지 규칙: 이 섹션은 홀수 페이지이므로 요청에 모델, 인물, 착용컷, 사용자가 포함되면 1명 이하로 자연스럽게 배치할 수 있다. 단 같은 위치와 같은 포즈를 반복하지 않는다."
+      : "모델/인물 이미지 규칙: 이 섹션은 짝수 페이지이므로 모델, 인물, 얼굴, 전신, 착용컷, 손 모델을 새로 넣지 않는다. 제품컷, 아이콘, 표, 카드, 루틴, FAQ, 근거 자료 중심으로 구성한다.";
     const promptText = [
       "너는 커머스 상세페이지 리디자인 이미지 생성 엔진이다.",
       `이미지 생성 모델: ${modelInfo.label} (${modelInfo.id})`,
@@ -421,6 +425,7 @@ function buildSections(
       `판매 채널: ${payload.options.channel}`,
       `추가 요청사항: ${payload.request || "전환율 중심으로 리디자인"}`,
       payload.rolloutRequest ? `히어로 1장 검토 후 사용자가 요청한 반영사항: ${payload.rolloutRequest}` : "히어로 검토 후 반영사항: 없음",
+      modelPlacementRule,
       payload.knowledgeText ? `맞춤형 Data 설정: ${payload.knowledgeText.slice(0, 18000)}` : "맞춤형 Data 설정: 없음",
       `분석 요약: ${JSON.stringify(analysis).slice(0, 2400)}`,
       "브랜드명 금지 규칙: 'phoenix detail page', 'Phoenix Detail Page', 'PHOENIX DETAIL PAGE', 'PD'는 서비스명 또는 도구명일 뿐이며 제품 브랜드가 아니다. 이 단어들을 이미지 안의 제품명, 브랜드명, 로고, 라벨, 헤드라인, 후기, FAQ, CTA, 패키지 텍스트로 절대 사용하지 않는다.",
@@ -487,8 +492,9 @@ function inferProjectTitle(analysis: unknown, channel: string) {
     return productName.includes(brand) ? `${productName} 리디자인` : `${brand} ${productName} 리디자인`;
   }
   if (productName) return `${productName} 리디자인`;
+  if (category === "업로드 자료 기반") return "업로드 자료 기반 상세페이지 생성";
   if (category) return `${category} 상세페이지 리디자인`;
-  return `${channel} 상세페이지 리디자인`;
+  return "업로드 자료 기반 상세페이지 생성";
 }
 
 function pickString(source: Record<string, unknown>, keys: string[]) {

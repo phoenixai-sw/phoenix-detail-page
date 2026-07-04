@@ -126,6 +126,10 @@ function buildEditPrompt({
   section: Record<string, unknown>;
   requestText: string;
 }) {
+  const sectionNumber = Number(String(section.id || "").replace(/\D/g, ""));
+  const modelPlacementRule = sectionNumber % 2 === 1
+    ? "MODEL_PLACEMENT_RULE: odd page. If the user asks for a model/person, use at most one model/person and avoid repeating the same position or pose."
+    : "MODEL_PLACEMENT_RULE: even page. Do not add a model/person/face/body/hand model. Use product, icons, tables, cards, routine, FAQ, evidence layouts instead.";
   return [
     "너는 커머스 상세페이지 섹션 이미지 편집 디렉터다.",
     "첨부된 9:16 상세페이지 섹션 이미지를 기반으로 전체 톤과 제품 맥락은 유지하되, 유저가 요청한 부분만 자연스럽게 편집한다.",
@@ -138,7 +142,7 @@ function buildEditPrompt({
     "브랜드명 금지 규칙: 'phoenix detail page', 'Phoenix Detail Page', 'PHOENIX DETAIL PAGE', 'PD'는 서비스명 또는 도구명일 뿐 제품 브랜드가 아니다. 이 단어들을 이미지 안의 제품명, 브랜드명, 로고, 라벨, 헤드라인, 후기, FAQ, CTA, 패키지 텍스트로 사용하지 않는다.",
     "브랜드 사용 규칙: 제품 브랜드명과 제품명은 첨부 이미지 또는 프로젝트 원본에서 확인되는 이름만 사용한다. 확인되지 않는 새 브랜드명, 새 제품명, 새 로고를 만들지 않는다.",
     "편집 규칙: 제품명, 패키지, 핵심 수치, 안전 표현, 원본의 중요한 정보는 유지한다. 근거 없는 성능, 리뷰, 인증, 수치를 새로 만들지 않는다. 한국어 문구는 짧고 명확하게 정리하고, 작은 글씨는 줄인다."
-  ].join("\n");
+  ].join("\n") + "\n" + modelPlacementRule;
 }
 
 async function editWithOpenAI({

@@ -3,6 +3,7 @@
 import * as React from "react";
 import NextImage from "next/image";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -12,12 +13,15 @@ import {
   Image as ImageIcon,
   KeyRound,
   Loader2,
+  Pencil,
   RefreshCw,
   Settings,
   Sparkles,
   Trash2,
-  Upload
+  Upload,
+  X
 } from "lucide-react";
+import JSZip from "jszip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -526,6 +530,31 @@ export function RedesignWizard() {
     }
   }
 
+  async function renameProject(project: Project, nextTitle: string) {
+    const title = nextTitle.trim();
+    if (!title) {
+      setToast("새 제목을 입력해주세요.");
+      return;
+    }
+
+    const updatedProject: Project = {
+      ...project,
+      title,
+      savedAt: project.savedAt || new Date().toISOString()
+    };
+
+    try {
+      await saveProjectToDb(updatedProject);
+      setProjects((current) => current.map((candidate) => (
+        candidate.id === updatedProject.id ? updatedProject : candidate
+      )));
+      setActiveProject((current) => current?.id === updatedProject.id ? updatedProject : current);
+      setToast("작업 제목을 수정했습니다.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "작업 제목 수정 중 오류가 발생했습니다.");
+    }
+  }
+
   async function registerKnowledgeFiles(nextFiles: File[]) {
     const selected = nextFiles.slice(0, 5);
     if (selected.length === 0) return;
@@ -786,6 +815,7 @@ export function RedesignWizard() {
             onNew={() => setView("workspace")}
             onOpenProject={openProject}
             onDeleteProject={deleteProject}
+            onRenameProject={renameProject}
             onSettings={() => setSettingsOpen(true)}
             onKnowledge={() => setKnowledgeOpen(true)}
             knowledgeCount={Math.max(knowledgeItems.length, serverConfig.knowledgeDocuments)}
@@ -1074,11 +1104,23 @@ async function deleteProjectFromDb(projectId: string) {
 }
 
 function projectDisplayTitle(project: Partial<Project>) {
+  const current = String(project.title || "").trim();
+  if (current && !isGeneratedPlaceholderTitle(current, project.channel)) return current;
   const inferred = inferTitleFromAnalysis(project.analysis);
   if (inferred) return inferred;
-  const current = String(project.title || "").trim();
   if (current && !current.includes(new Date().getFullYear().toString())) return current;
   return current || `${project.channel || "스마트스토어"} 상세페이지 리디자인`;
+}
+
+function isGeneratedPlaceholderTitle(title: string, channel?: string) {
+  const normalized = title.replace(/\s+/g, " ").trim();
+  const currentYear = new Date().getFullYear().toString();
+  return (
+    normalized.includes(currentYear) ||
+    normalized === `${channel || "스마트스토어"} 상세페이지 리디자인` ||
+    normalized === "업로드 자료 기반 추정 상세페이지 리디자인" ||
+    normalized === "업로드 자료 기반 상세페이지 생성"
+  );
 }
 
 function mergeGeneratedProject(baseProject: Project, generatedProject: Project): Project {
@@ -1116,6 +1158,35 @@ function downloadDataUrl(url: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  try {
+    downloadDataUrl(url, fileName);
+  } finally {
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+async function downloadSectionsAsZip(projectTitle: string, sections: SectionResult[]) {
+  const zip = new JSZip();
+  for (const [index, section] of sections.entries()) {
+    if (!section.imageUrl) continue;
+    const blob = await imageUrlToBlob(section.imageUrl);
+    zip.file(buildImageFileName(projectTitle, section, index), blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(zipBlob, `${sanitizeDownloadName(projectTitle || "redesign-results")}.zip`);
+}
+
+async function imageUrlToBlob(url: string) {
+  if (url.startsWith("data:")) return dataUrlToBlob(url);
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("다운로드할 이미지를 읽지 못했습니다.");
+  return response.blob();
 }
 
 function buildImageFileName(projectTitle: string, section: SectionResult, index: number, revisionLabel = "") {
@@ -1302,6 +1373,7 @@ function inferTitleFromAnalysis(analysis: unknown) {
 
   if (brand && productName) return productName.includes(brand) ? `${productName} 리디자인` : `${brand} ${productName} 리디자인`;
   if (productName) return `${productName} 리디자인`;
+  if (category === "업로드 자료 기반") return "업로드 자료 기반 상세페이지 생성";
   if (category) return `${category} 상세페이지 리디자인`;
   return "";
 }
@@ -1508,6 +1580,7 @@ function Dashboard({
   onNew,
   onOpenProject,
   onDeleteProject,
+  onRenameProject,
   onSettings,
   onKnowledge,
   knowledgeCount,
@@ -1517,14 +1590,32 @@ function Dashboard({
   onNew: () => void;
   onOpenProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
+  onRenameProject: (project: Project, title: string) => void;
   onSettings: () => void;
   onKnowledge: () => void;
   knowledgeCount: number;
   serverConfig: ServerConfig;
 }) {
+  const [editingProjectId, setEditingProjectId] = React.useState("");
+  const [draftTitle, setDraftTitle] = React.useState("");
   const averageImageCount = projects.length > 0
     ? (projects.reduce((sum, project) => sum + project.count, 0) / projects.length).toFixed(1)
     : "-";
+
+  function startTitleEdit(project: Project) {
+    setEditingProjectId(project.id);
+    setDraftTitle(projectDisplayTitle(project));
+  }
+
+  function cancelTitleEdit() {
+    setEditingProjectId("");
+    setDraftTitle("");
+  }
+
+  function saveTitleEdit(project: Project) {
+    onRenameProject(project, draftTitle);
+    cancelTitleEdit();
+  }
 
   return (
     <section>
@@ -1541,14 +1632,16 @@ function Dashboard({
                 <CardTitle>최근 제작 작업</CardTitle>
                 <CardDescription>업로드한 원본 자료를 기준으로 만든 이미지 작업 목록</CardDescription>
             </div>
-            <Badge variant="green">6~8장 기본</Badge>
+            <Badge variant="green">8장 상세</Badge>
           </CardHeader>
           <CardContent className="grid gap-3">
             {projects.length > 0 ? (
-              projects.map((project) => (
+              projects.map((project) => {
+                const isEditing = editingProjectId === project.id;
+                return (
                 <div
                   key={project.id}
-                  className="grid grid-cols-[52px_minmax(0,1fr)_40px] items-center gap-3 rounded-md border border-border bg-white p-3 transition hover:border-[#ffd3c8] hover:bg-[#fff3ee]"
+                  className="grid grid-cols-[52px_minmax(0,1fr)_88px] items-center gap-3 rounded-md border border-border bg-white p-3 transition hover:border-[#ffd3c8] hover:bg-[#fff3ee]"
                 >
                   <button
                     type="button"
@@ -1557,28 +1650,87 @@ function Dashboard({
                     aria-label={`${project.title} 열기`}
                   >
                     <MiniThumb />
-                    <div className="min-w-0">
-                      <strong className="block truncate text-sm">{project.title}</strong>
-                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{project.channel}</span>
-                        <span>{project.count}장</span>
-                        <span>{project.ratio}</span>
-                        <span>{models[project.model].label}</span>
-                      </div>
-                    </div>
                   </button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="justify-self-end text-muted-foreground hover:text-destructive"
-                    onClick={() => onDeleteProject(project)}
-                    aria-label={`${project.title} 삭제`}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                  <div className="min-w-0">
+                    {isEditing ? (
+                      <Input
+                        value={draftTitle}
+                        onChange={(event) => setDraftTitle(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") saveTitleEdit(project);
+                          if (event.key === "Escape") cancelTitleEdit();
+                        }}
+                        aria-label="작업 제목 수정"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="block max-w-full truncate text-left text-sm font-bold transition hover:text-[#0f766e]"
+                        onClick={() => onOpenProject(project)}
+                      >
+                        {projectDisplayTitle(project)}
+                      </button>
+                    )}
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{project.channel}</span>
+                      <span>{project.count}장</span>
+                      <span>{project.ratio}</span>
+                      <span>{models[project.model].label}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-1">
+                    {isEditing ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-[#0f766e]"
+                          onClick={() => saveTitleEdit(project)}
+                          aria-label={`${project.title} 제목 저장`}
+                        >
+                          <Check className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground"
+                          onClick={cancelTitleEdit}
+                          aria-label="제목 수정 취소"
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-[#0f766e]"
+                          onClick={() => startTitleEdit(project)}
+                          aria-label={`${project.title} 제목 수정`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => onDeleteProject(project)}
+                          aria-label={`${project.title} 삭제`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))
+              );
+              })
             ) : (
               <div className="grid min-h-48 place-items-center rounded-md border border-dashed border-border bg-white/60 p-6 text-center">
                 <div>
@@ -1818,7 +1970,7 @@ function Workspace(props: {
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <OptionGroup label="결과 장수" value={String(count)} options={[["1", "히어로 1장"], ["8", "기본 6~8장"]]} onChange={(value) => setCount(Number(value))} />
+              <OptionGroup label="생성 페이지" value={String(count)} options={[["1", "1장(히어로)"], ["4", "4장(심플)"], ["8", "8장(상세)"]]} onChange={(value) => setCount(Number(value))} />
               <OptionGroup label="출력 비율" value={ratio} options={[["9:16", "9:16"], ["1080×1920", "1080×1920"]]} onChange={setRatio} />
               <ChannelOptionGroup value={channel} onChange={setChannel} />
             </CardContent>
@@ -1932,6 +2084,8 @@ function Results({
   generating: boolean;
   editingSectionId: string | null;
 }) {
+  const [downloadingZip, setDownloadingZip] = React.useState(false);
+
   if (!project) {
     return <Card><CardContent>아직 생성된 프로젝트가 없습니다.</CardContent></Card>;
   }
@@ -1939,18 +2093,21 @@ function Results({
   const title = projectDisplayTitle(project);
   const downloadableSections = project.sections.filter((section) => section.imageUrl);
 
-  function downloadAllImages() {
+  async function downloadAllImages() {
     if (downloadableSections.length === 0) {
       onToast("다운로드할 이미지가 없습니다.");
       return;
     }
 
-    downloadableSections.forEach((section, index) => {
-      window.setTimeout(() => {
-        downloadDataUrl(section.imageUrl || "", buildImageFileName(title, section, index));
-      }, index * 250);
-    });
-    onToast(`${downloadableSections.length}개 이미지를 다운로드합니다.`);
+    setDownloadingZip(true);
+    try {
+      await downloadSectionsAsZip(title, downloadableSections);
+      onToast(`${downloadableSections.length}개 이미지를 ZIP 파일 하나로 다운로드했습니다.`);
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "ZIP 다운로드 중 오류가 발생했습니다.");
+    } finally {
+      setDownloadingZip(false);
+    }
   }
 
   return (
@@ -1958,7 +2115,10 @@ function Results({
       <Topbar eyebrow="OUTPUT" title={title}>
         <Button variant="secondary" onClick={onSave}><FileText className="size-4" />결과 저장</Button>
         <Button variant="secondary" onClick={() => onToast("히어로 1장 재생성은 다음 단계에서 연결할 예정입니다.")}><RefreshCw className="size-4" />히어로 다시 생성</Button>
-        <Button onClick={downloadAllImages} disabled={downloadableSections.length === 0}><Download className="size-4" />결과 다운로드</Button>
+        <Button onClick={downloadAllImages} disabled={downloadableSections.length === 0 || downloadingZip}>
+          {downloadingZip ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          결과 다운로드
+        </Button>
       </Topbar>
 
       <div className={cn("grid gap-4", showRollout ? "grid-cols-[minmax(0,1fr)_320px] max-xl:grid-cols-1" : "grid-cols-1")}>
@@ -2381,7 +2541,7 @@ function OptionGroup({
   return (
     <div>
       <label className="mb-2 block text-xs font-bold text-muted-foreground">{label}</label>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={cn("grid gap-2", options.length === 3 ? "grid-cols-3 max-sm:grid-cols-1" : "grid-cols-2")}>
         {options.map(([optionValue, optionLabel]) => (
           <button
             key={optionValue}
