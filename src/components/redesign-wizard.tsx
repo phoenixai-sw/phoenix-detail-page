@@ -2832,7 +2832,7 @@ function RatioOptionGroup({ value, onChange }: { value: string; onChange: (value
               type="button"
               className={cn(
                 "rounded-md border border-border bg-white p-3 text-left transition hover:border-[#ff9f7a] hover:bg-[#fff8f5]",
-                selected && "border-[#101726] bg-[#101726] text-white shadow-sm"
+                selected && "border-[#101726] bg-[#101726] text-white shadow-sm hover:border-[#101726] hover:bg-[#101726] hover:text-white"
               )}
               onClick={() => onChange(option.value)}
             >
