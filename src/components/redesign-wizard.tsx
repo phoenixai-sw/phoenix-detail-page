@@ -1081,7 +1081,7 @@ async function readApiResponse(response: Response): Promise<any> {
 function simplifyPlainTextError(text: string, status: number) {
   const message = text.trim() || "요청 처리 중 오류가 발생했습니다.";
   if (status === 413 || message.toLowerCase().includes("request entity too large")) {
-    return "이미지 데이터가 너무 커서 부분 편집 요청을 보낼 수 없습니다. 편집용 이미지를 압축해 다시 시도했지만, 계속 실패하면 해당 섹션을 다시 생성해 주세요.";
+    return "이미지 데이터가 너무 커서 요청을 보낼 수 없습니다. 참고 이미지를 줄여 다시 시도해주세요.";
   }
   if (isTimeoutHtmlError(message)) {
     return "이미지 생성 응답 시간이 초과되었습니다. 업로드 이미지를 더 작게 줄이거나, 긴 상세페이지 이미지는 나눠서 업로드한 뒤 다시 시도해주세요.";
@@ -1311,6 +1311,37 @@ async function compressImageForRequest(dataUrl: string) {
       { maxWidth: 760, quality: 0.72 },
       { maxWidth: 640, quality: 0.68 },
       { maxWidth: 520, quality: 0.62 }
+    ];
+
+    let bestDataUrl = dataUrl;
+    let bestBytes = estimateDataUrlBytes(dataUrl);
+    for (const attempt of attempts) {
+      const nextDataUrl = await resizeImageToJpeg(image, attempt.maxWidth, attempt.quality);
+      const nextBytes = estimateDataUrlBytes(nextDataUrl);
+      if (nextBytes < bestBytes) {
+        bestDataUrl = nextDataUrl;
+        bestBytes = nextBytes;
+      }
+      if (nextBytes <= maxBytes) return nextDataUrl;
+    }
+
+    return bestDataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
+async function compressReferenceImageForUpload(dataUrl: string) {
+  if (!dataUrl.startsWith("data:image/")) return dataUrl;
+
+  try {
+    const image = await loadDataUrlImage(dataUrl);
+    const maxBytes = 320 * 1024;
+    const attempts = [
+      { maxWidth: 640, quality: 0.68 },
+      { maxWidth: 520, quality: 0.62 },
+      { maxWidth: 420, quality: 0.58 },
+      { maxWidth: 360, quality: 0.54 }
     ];
 
     let bestDataUrl = dataUrl;
@@ -1595,12 +1626,21 @@ async function normalizeFilesForUpload(files: File[]) {
 async function projectImagesToReferenceFiles(project?: Project | null) {
   const sections = (project?.sections || [])
     .filter((section) => section.imageUrl)
-    .slice(-4);
+    .slice(-3);
 
   const output: File[] = [];
   for (const [index, section] of sections.entries()) {
-    const blob = await imageUrlToBlob(section.imageUrl || "");
-    output.push(new File([blob], `${section.id || `section-${index + 1}`}.jpg`, { type: blob.type || "image/jpeg" }));
+    try {
+      const sourceUrl = section.imageUrl || "";
+      const sourceDataUrl = sourceUrl.startsWith("data:")
+        ? sourceUrl
+        : await blobToDataUrl(await imageUrlToBlob(sourceUrl));
+      const compressedDataUrl = await compressReferenceImageForUpload(sourceDataUrl);
+      const blob = dataUrlToBlob(compressedDataUrl);
+      output.push(new File([blob], `${section.id || `section-${index + 1}`}-reference.jpg`, { type: "image/jpeg" }));
+    } catch {
+      // A missing reference image should not block the whole additional generation flow.
+    }
   }
 
   return output;
