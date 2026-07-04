@@ -113,6 +113,7 @@ const projectDbName = "phoenix-detail-page-redesign-projects";
 const projectStoreName = "projects";
 const phoenixPortalUrl = "https://phoenix-portal.site/";
 const phoenixPromoImage = "/phoenix-web-promo.png";
+const maxProjectSections = 12;
 
 const models = {
   openai: {
@@ -553,6 +554,43 @@ export function RedesignWizard() {
     }
   }
 
+  async function addMoreSections(addCount: number) {
+    const baseProject = currentProject;
+    if (!baseProject?.sections.length) {
+      await generate(addCount, rolloutRequest);
+      return;
+    }
+
+    const currentMaxSection = Math.max(
+      0,
+      ...baseProject.sections
+        .map((section) => Number(section.id.replace(/\D/g, "")))
+        .filter((sectionNumber) => Number.isFinite(sectionNumber))
+    );
+    const remainingSlots = Math.max(0, maxProjectSections - currentMaxSection);
+    const safeCount = Math.min(addCount, remainingSlots);
+
+    if (safeCount <= 0) {
+      setToast(`최대 ${maxProjectSections}장까지 생성되었습니다.`);
+      return;
+    }
+
+    reportClientLog("generate-additional:start", {
+      existing: baseProject.sections.length,
+      currentMaxSection,
+      addCount: safeCount
+    });
+
+    let workingProject = baseProject;
+    for (let offset = 1; offset <= safeCount; offset += 1) {
+      const sectionNumber = currentMaxSection + offset;
+      setToast(`S${sectionNumber} 섹션을 추가 생성합니다.`);
+      const nextProject = await generate(1, rolloutRequest, sectionNumber, workingProject, true, safeCount, offset);
+      if (!nextProject) break;
+      workingProject = nextProject;
+    }
+  }
+
   async function renameProject(project: Project, nextTitle: string) {
     const title = nextTitle.trim();
     if (!title) {
@@ -881,6 +919,7 @@ export function RedesignWizard() {
             onSave={() => saveCurrentProject(currentProject)}
             onEditSection={editSection}
             onGenerateRest={generateRemainingSections}
+            onAddSections={addMoreSections}
             generating={generating}
             editingSectionId={editingSectionId}
           />
@@ -2147,6 +2186,7 @@ function Results({
   onSave,
   onEditSection,
   onGenerateRest,
+  onAddSections,
   generating,
   editingSectionId
 }: {
@@ -2158,6 +2198,7 @@ function Results({
   onSave: () => void;
   onEditSection: (sectionId: string, editRequest: string, model: Model) => void;
   onGenerateRest: () => void;
+  onAddSections: (count: number) => void;
   generating: boolean;
   editingSectionId: string | null;
 }) {
@@ -2169,6 +2210,12 @@ function Results({
   const showRollout = project.sections.length < 8;
   const title = projectDisplayTitle(project);
   const downloadableSections = project.sections.filter((section) => section.imageUrl);
+  const currentMaxSection = Math.max(
+    0,
+    ...project.sections
+      .map((section) => Number(section.id.replace(/\D/g, "")))
+      .filter((sectionNumber) => Number.isFinite(sectionNumber))
+  );
 
   async function downloadAllImages() {
     if (downloadableSections.length === 0) {
@@ -2222,6 +2269,12 @@ function Results({
                 disabled={generating}
               />
             ))}
+            <AddSectionCard
+              currentCount={Math.min(currentMaxSection, maxProjectSections)}
+              maxCount={maxProjectSections}
+              generating={generating}
+              onAddSections={onAddSections}
+            />
           </CardContent>
         </Card>
 
@@ -2266,6 +2319,72 @@ const quickEditPresets = [
   ["중복 레이아웃 줄이기", "다른 섹션과 반복되어 보이지 않도록 제품 위치, 카드 구조, 정보 흐름을 다르게 재구성해주세요."],
   ["안전 표현", "과장되거나 효능을 단정하는 표현은 줄이고 식품/건강 카테고리에 안전한 표현으로 완화해주세요."]
 ];
+
+function AddSectionCard({
+  currentCount,
+  maxCount,
+  generating,
+  onAddSections
+}: {
+  currentCount: number;
+  maxCount: number;
+  generating: boolean;
+  onAddSections: (count: number) => void;
+}) {
+  const remaining = Math.max(0, maxCount - currentCount);
+  const options = [1, 2, 3].filter((count) => count <= remaining);
+
+  return (
+    <Card className="grid min-h-[320px] place-items-center border-dashed border-[#ffd3c8] bg-[#fff8f5] shadow-none">
+      <CardContent className="grid gap-4 p-5 text-center">
+        <div>
+          <Badge variant={remaining > 0 ? "green" : "default"}>
+            현재 {currentCount}장 / 최대 {maxCount}장
+          </Badge>
+          <h3 className="mt-3 text-base font-bold">페이지 추가 생성</h3>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            마지막 페이지 뒤에 이어질 섹션을 추가합니다. 현재 작업의 비율, 판매 채널, 요청 메모를 유지합니다.
+          </p>
+        </div>
+
+        <div className="rounded-md border border-[#bfeee7] bg-white p-3 text-left shadow-sm">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[#e9fbf7] text-[11px] font-black text-[#0f766e]">
+              TIP
+            </span>
+            <div>
+              <strong className="block text-xs">원본 자료가 남아 있으면 더 정확합니다.</strong>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                처음 업로드한 이미지나 PDF가 현재 작업 화면에 남아 있을 때 제품 정보, 구성, 문구를 더 안정적으로 이어받습니다.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {options.length > 0 ? (
+          <div className="grid gap-2">
+            {options.map((count) => (
+              <Button
+                key={count}
+                type="button"
+                variant={count === 1 ? "secondary" : "ghost"}
+                onClick={() => onAddSections(count)}
+                disabled={generating}
+              >
+                {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {count}장 추가하기
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-md border border-border bg-white p-3 text-sm font-bold text-muted-foreground">
+            최대 {maxCount}장까지 생성되었습니다.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function SectionResultCard({
   section,

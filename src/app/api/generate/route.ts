@@ -17,6 +17,7 @@ const OPENAI_IMAGE_FALLBACK_TIMEOUT_MS = Number(process.env.OPENAI_IMAGE_FALLBAC
 const GOOGLE_NANO_BANANA_2_MODEL = "gemini-3.1-flash-image-preview";
 const ANALYSIS_MODEL = process.env.OPENAI_ANALYSIS_MODEL || "gpt-5.5";
 const MAX_REFERENCE_IMAGES = 4;
+const MAX_PROJECT_SECTIONS = 12;
 
 type Provider = "openai" | "google";
 
@@ -54,8 +55,8 @@ export async function POST(request: NextRequest) {
     const provider = String(form.get("model") || "openai") === "google" ? "google" : "openai";
     const channel = String(form.get("channel") || "스마트스토어");
     const ratio = String(form.get("ratio") || "9:16");
-    const count = clamp(Number(form.get("count") || 1), 1, 10);
-    const startSection = clamp(Number(form.get("startSection") || 1), 1, 10);
+    const count = clamp(Number(form.get("count") || 1), 1, MAX_PROJECT_SECTIONS);
+    const startSection = clamp(Number(form.get("startSection") || 1), 1, MAX_PROJECT_SECTIONS);
     const openaiKey = String(form.get("openaiKey") || "");
     const googleKey = String(form.get("googleKey") || "");
     const apiKey = provider === "google" ? googleKey : openaiKey;
@@ -98,7 +99,10 @@ export async function POST(request: NextRequest) {
     console.info(`[generate] analysis start job=${jobId}`);
     const analysis = await analyzeSource({ provider, apiKey, references, payload, modelInfo });
     console.info(`[generate] analysis done job=${jobId}`);
-    const sections = buildSections(count, startSection, payload, analysis, modelInfo);
+    const sections = buildSections(Math.min(count, MAX_PROJECT_SECTIONS - startSection + 1), startSection, payload, analysis, modelInfo);
+    if (sections.length === 0) {
+      return NextResponse.json({ error: `최대 ${MAX_PROJECT_SECTIONS}장까지 생성할 수 있습니다.` }, { status: 400 });
+    }
     const projectTitle = inferProjectTitle(analysis, channel);
 
     const generatedSections = [];
@@ -477,7 +481,9 @@ function sectionTemplates(count: number, startSection = 1) {
     ["S7 후기 카드", "실제 리뷰가 있을 때 사용감 문장 후기 카드로 구성합니다.", "리뷰, 평점", "후기 카드 6개 내외의 콜라주형 레이아웃. 제품컷은 배경 요소로만 약하게 사용."],
     ["S8 FAQ/오퍼", "마지막 구매 저항을 해소하고 CTA로 마무리합니다.", "배송, AS, 혜택", "FAQ 아코디언처럼 보이는 질문 카드와 하단 CTA. 마지막 행동 유도에 집중."],
     ["S9 비교/보증", "선택 불안을 줄이는 비교표와 보증 구조를 제안합니다.", "보증, 비교 근거", "비교 매트릭스와 보증 배지 중심. 제품 이미지는 작은 확인 요소."],
-    ["S10 최종 CTA", "혜택과 구매 이유를 다시 압축해 마지막 행동을 유도합니다.", "오퍼, 사은품, 한정 조건", "최종 CTA 전용. 기존 섹션 요약 3개와 구매 버튼을 하단에 강하게 배치."]
+    ["S10 최종 CTA", "혜택과 구매 이유를 다시 압축해 마지막 행동을 유도합니다.", "오퍼, 사은품, 한정 조건", "최종 CTA 전용. 기존 섹션 요약 3개와 구매 버튼을 하단에 강하게 배치."],
+    ["S11 혜택/구성 정리", "구성품, 구매 혜택, 선택 옵션을 한눈에 정리해 마지막 비교 피로를 줄입니다.", "구성, 혜택, 옵션", "구성품/혜택/옵션을 카드 3~4개로 정리. 가격 단정 대신 구매 판단에 필요한 비교 정보와 포함 내용을 명확히 보여줌."],
+    ["S12 마지막 안심 FAQ", "배송, 교환, 사용법, 보증, 고객센터 정보를 다시 정리해 구매 직전 불안을 해소합니다.", "배송, 교환, 사용법, 보증", "마지막 안심 FAQ와 짧은 CTA 중심. 질문 3~5개를 아코디언형 카드로 구성하고 하단에 부드러운 행동 유도."]
   ];
 
   return templates
