@@ -2271,7 +2271,7 @@ function Results({
   if (!project) {
     return <Card><CardContent>아직 생성된 프로젝트가 없습니다.</CardContent></Card>;
   }
-  const showRollout = project.sections.length < 8;
+  const showRollout = false;
   const title = projectDisplayTitle(project);
   const downloadableSections = project.sections.filter((section) => section.imageUrl);
   const currentMaxSection = Math.max(
@@ -2342,32 +2342,6 @@ function Results({
           </CardContent>
         </Card>
 
-        {showRollout ? (
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>첫 장 확인 후 메모</CardTitle>
-                <CardDescription>첫 장을 보고 나머지 이미지에 반영할 방향을 적어주세요.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Textarea
-                value={rolloutRequest}
-                onChange={(event) => setRolloutRequest(event.target.value)}
-                placeholder="예: 제품은 잘 보이는데 카피가 너무 과장되어 보여요. 나머지는 더 신뢰감 있게, 리뷰/근거 중심으로 만들고 CTA는 덜 튀게 해주세요."
-              />
-              <Button onClick={onGenerateRest} disabled={generating}>
-                {generating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                나머지 섹션 만들기
-              </Button>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                이 요청은 S2 이후 섹션 제작 프롬프트에 함께 반영됩니다. 테스트 비용을 줄이기 위해 먼저 첫 장을 확인한 뒤 확장하는 흐름입니다.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        ) : null}
       </div>
     </section>
   );
