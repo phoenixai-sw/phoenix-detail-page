@@ -834,8 +834,8 @@ export function RedesignWizard() {
             <NextImage src="/phoenix-ai-logo.png" alt="Phoenix AI" width={42} height={42} className="object-contain" />
           </div>
           <div className="min-w-0">
-            <strong className="block truncate text-sm leading-tight">phoenix detail page</strong>
-            <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">AI production studio</span>
+            <strong className="block truncate text-sm leading-tight">phoenix pages</strong>
+            <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">MeMe studio</span>
           </div>
         </button>
         <nav className="grid gap-2 max-[1120px]:grid-cols-3">
