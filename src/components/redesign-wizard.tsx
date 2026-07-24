@@ -421,7 +421,7 @@ export function RedesignWizard() {
       startedAt: Date.now()
     });
     setGenerating(true);
-    setToast("원본 자료를 이미지 생성용 PNG로 변환하는 중입니다.");
+    setToast("원본 자료를 업로드용으로 압축 변환하는 중입니다.");
     const abortController = new AbortController();
     generationAbortRef.current = abortController;
 
@@ -1798,6 +1798,9 @@ async function extractPdfText(file: File) {
   return pages.join("\n");
 }
 
+// Vercel 서버리스 요청 본문 한도(4.5MB) 아래로 유지하기 위한 업로드 총량 상한
+const MAX_UPLOAD_TOTAL_BYTES = 3_500_000;
+
 async function normalizeFilesForUpload(files: File[]) {
   const output: File[] = [];
   for (const file of files) {
@@ -1807,7 +1810,40 @@ async function normalizeFilesForUpload(files: File[]) {
       output.push(...(await renderImageToReferenceFiles(file)));
     }
   }
-  return output.slice(0, 4);
+
+  let selected = output.slice(0, 4);
+  const totalBytes = selected.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > MAX_UPLOAD_TOTAL_BYTES) {
+    selected = await Promise.all(selected.map((file) => recompressReferenceFile(file, 1000, 1500, 0.72)));
+  }
+  return selected;
+}
+
+async function recompressReferenceFile(file: File, maxWidth: number, maxHeight: number, quality: number) {
+  try {
+    const image = await loadImageElement(file);
+    const naturalWidth = image.naturalWidth || image.width;
+    const naturalHeight = image.naturalHeight || image.height;
+    if (!naturalWidth || !naturalHeight) return file;
+
+    const scale = Math.min(1, maxWidth / naturalWidth, maxHeight / naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(naturalHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return file;
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(image.src);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/i, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
 }
 
 async function projectImagesToReferenceFiles(project?: Project | null) {
@@ -1904,12 +1940,12 @@ async function cropImageToPngFile({
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((result) => {
       if (result) resolve(result);
-      else reject(new Error("이미지를 PNG로 변환하지 못했습니다."));
-    }, "image/png");
+      else reject(new Error("이미지를 변환하지 못했습니다."));
+    }, "image/jpeg", 0.85);
   });
 
   const safeName = fileName.replace(/\.[^.]+$/i, "");
-  return new File([blob], `${safeName}-reference-${index + 1}.png`, { type: "image/png" });
+  return new File([blob], `${safeName}-reference-${index + 1}.jpg`, { type: "image/jpeg" });
 }
 
 async function renderPdfToImages(file: File) {
@@ -1934,9 +1970,9 @@ async function renderPdfToImages(file: File) {
       canvas.toBlob((result) => {
         if (result) resolve(result);
         else reject(new Error("PDF 페이지를 이미지로 변환하지 못했습니다."));
-      }, "image/png");
+      }, "image/jpeg", 0.85);
     });
-    pages.push(new File([blob], `${file.name.replace(/\.pdf$/i, "")}-page-${pageNumber}.png`, { type: "image/png" }));
+    pages.push(new File([blob], `${file.name.replace(/\.pdf$/i, "")}-page-${pageNumber}.jpg`, { type: "image/jpeg" }));
   }
 
   return pages;
