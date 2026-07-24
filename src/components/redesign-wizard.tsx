@@ -7,12 +7,15 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  Cloud,
   Download,
   FileImage,
   FileText,
   Image as ImageIcon,
   KeyRound,
   Loader2,
+  LogIn,
+  LogOut,
   Pencil,
   RefreshCw,
   Settings,
@@ -28,6 +31,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  type CloudProjectSummary,
+  type CloudUser,
+  deleteCloudProject,
+  fetchCloudProject,
+  isCloudConfigured,
+  listCloudProjects,
+  signInWithGoogle,
+  signOutCloud,
+  subscribeCloudUser,
+  upsertCloudProject
+} from "@/lib/cloud-sync";
 import { cn } from "@/lib/utils";
 
 type Model = "openai" | "google";
@@ -264,6 +279,10 @@ export function RedesignWizard() {
   const [editingSectionId, setEditingSectionId] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState("");
   const [rolloutRequest, setRolloutRequest] = React.useState("");
+  const [cloudUser, setCloudUser] = React.useState<CloudUser | null>(null);
+  const [cloudOpen, setCloudOpen] = React.useState(false);
+  const [cloudRows, setCloudRows] = React.useState<CloudProjectSummary[]>([]);
+  const [cloudBusy, setCloudBusy] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const knowledgeInputRef = React.useRef<HTMLInputElement>(null);
   const generationAbortRef = React.useRef<AbortController | null>(null);
@@ -285,6 +304,8 @@ export function RedesignWizard() {
       setActiveProject(savedProjects[0]);
     });
   }, []);
+
+  React.useEffect(() => subscribeCloudUser(setCloudUser), []);
 
   React.useEffect(() => {
     if (!toast) return;
@@ -693,9 +714,102 @@ export function RedesignWizard() {
       await saveProjectToDb(savedProject);
       setProjects((current) => [savedProject, ...current.filter((candidate) => candidate.id !== savedProject.id)].slice(0, 20));
       setActiveProject(savedProject);
-      setToast("결과를 저장했습니다. 홈보드에서 다시 열 수 있습니다.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "결과 저장 중 오류가 발생했습니다.");
+      return;
+    }
+
+    if (!cloudUser) {
+      setToast("결과를 저장했습니다. 홈보드에서 다시 열 수 있습니다.");
+      return;
+    }
+    try {
+      await upsertCloudProject(cloudPayloadFromProject(savedProject));
+      setToast("결과를 저장하고 클라우드에 동기화했습니다.");
+    } catch {
+      setToast("이 기기에는 저장됐지만 클라우드 동기화에 실패했습니다. 잠시 후 다시 저장해주세요.");
+    }
+  }
+
+  async function cloudSignIn() {
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Google 로그인을 시작하지 못했습니다.");
+    }
+  }
+
+  async function cloudSignOut() {
+    try {
+      await signOutCloud();
+      setToast("클라우드에서 로그아웃했습니다. 이 기기의 작업은 그대로 유지됩니다.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "로그아웃 중 오류가 발생했습니다.");
+    }
+  }
+
+  async function refreshCloudRows() {
+    setCloudBusy(true);
+    try {
+      setCloudRows(await listCloudProjects());
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "클라우드 목록을 불러오지 못했습니다.");
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
+  function openCloudPanel() {
+    setCloudOpen(true);
+    void refreshCloudRows();
+  }
+
+  async function loadFromCloud(localId: string) {
+    setCloudBusy(true);
+    try {
+      const row = await fetchCloudProject(localId);
+      const sections = Array.isArray(row?.sections) ? (row.sections as SectionResult[]) : [];
+      if (!row || sections.length === 0) {
+        setToast("클라우드 프로젝트를 불러오지 못했습니다.");
+        return;
+      }
+      const restored: Project = {
+        id: row.local_id,
+        title: row.title,
+        channel: row.channel || "스마트스토어",
+        model: row.model === "google" ? "google" : "openai",
+        count: sections.length,
+        ratio: row.ratio || "9:16",
+        status: "저장됨",
+        files: [],
+        request: row.request || "",
+        createdAt: row.created_at,
+        sections,
+        savedAt: row.updated_at
+      };
+      await saveProjectToDb(restored);
+      setProjects((current) => [restored, ...current.filter((candidate) => candidate.id !== restored.id)].slice(0, 20));
+      setActiveProject(restored);
+      setView("results");
+      setCloudOpen(false);
+      setToast("클라우드 프로젝트를 불러왔습니다.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "클라우드 프로젝트를 불러오지 못했습니다.");
+    } finally {
+      setCloudBusy(false);
+    }
+  }
+
+  async function removeFromCloud(localId: string) {
+    setCloudBusy(true);
+    try {
+      await deleteCloudProject(localId);
+      setCloudRows((current) => current.filter((row) => row.local_id !== localId));
+      setToast("클라우드에서 삭제했습니다. 이 기기에 저장된 사본은 유지됩니다.");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "클라우드 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setCloudBusy(false);
     }
   }
 
@@ -892,6 +1006,11 @@ export function RedesignWizard() {
             onKnowledge={() => setKnowledgeOpen(true)}
             knowledgeCount={Math.max(knowledgeItems.length, serverConfig.knowledgeDocuments)}
             serverConfig={serverConfig}
+            cloudConfigured={isCloudConfigured()}
+            cloudUser={cloudUser}
+            onCloudSignIn={cloudSignIn}
+            onCloudSignOut={cloudSignOut}
+            onCloudOpen={openCloudPanel}
           />
         )}
         {view === "workspace" && (
@@ -935,6 +1054,49 @@ export function RedesignWizard() {
           />
         )}
       </main>
+
+      <Dialog open={cloudOpen} onOpenChange={setCloudOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>내 클라우드 프로젝트</DialogTitle>
+            <DialogDescription>
+              {cloudUser ? `${cloudUser.email} 계정에 저장된 작업 목록입니다. 불러오면 이 기기의 홈보드에 추가됩니다.` : "Google 로그인 후 사용할 수 있습니다."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[52vh] gap-2 overflow-y-auto">
+            {cloudBusy && cloudRows.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />클라우드 목록을 불러오는 중...
+              </div>
+            ) : cloudRows.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-muted-foreground">
+                아직 클라우드에 저장된 작업이 없습니다. 결과 화면에서 저장하면 자동으로 동기화됩니다.
+              </div>
+            ) : (
+              cloudRows.map((row) => (
+                <div key={row.local_id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-white p-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{row.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.channel || "채널 미지정"} · {row.ratio || "9:16"} · {new Date(row.updated_at).toLocaleString("ko-KR")}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button size="sm" disabled={cloudBusy} onClick={() => loadFromCloud(row.local_id)}><Download className="size-4" />불러오기</Button>
+                    <Button size="sm" variant="ghost" disabled={cloudBusy} onClick={() => removeFromCloud(row.local_id)} aria-label={`${row.title} 클라우드에서 삭제`}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" disabled={cloudBusy} onClick={() => refreshCloudRows()}><RefreshCw className="size-4" />새로고침</Button>
+            <Button variant="ghost" onClick={() => setCloudOpen(false)}>닫기</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent>
@@ -1162,6 +1324,18 @@ async function saveProjectToDb(project: Project) {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
+}
+
+function cloudPayloadFromProject(project: Project) {
+  return {
+    localId: project.id,
+    title: project.title,
+    channel: project.channel,
+    ratio: project.ratio,
+    model: project.model,
+    request: project.request,
+    sections: project.sections
+  };
 }
 
 async function deleteProjectFromDb(projectId: string) {
@@ -1777,7 +1951,12 @@ function Dashboard({
   onSettings,
   onKnowledge,
   knowledgeCount,
-  serverConfig
+  serverConfig,
+  cloudConfigured,
+  cloudUser,
+  onCloudSignIn,
+  onCloudSignOut,
+  onCloudOpen
 }: {
   projects: Project[];
   onNew: () => void;
@@ -1788,6 +1967,11 @@ function Dashboard({
   onKnowledge: () => void;
   knowledgeCount: number;
   serverConfig: ServerConfig;
+  cloudConfigured: boolean;
+  cloudUser: CloudUser | null;
+  onCloudSignIn: () => void;
+  onCloudSignOut: () => void;
+  onCloudOpen: () => void;
 }) {
   const [editingProjectId, setEditingProjectId] = React.useState("");
   const [draftTitle, setDraftTitle] = React.useState("");
@@ -1813,6 +1997,14 @@ function Dashboard({
   return (
     <section>
       <Topbar eyebrow="HOME">
+        {cloudConfigured && (cloudUser ? (
+          <>
+            <Button variant="secondary" onClick={onCloudOpen}><Cloud className="size-4" />내 클라우드</Button>
+            <Button variant="ghost" onClick={onCloudSignOut} title={cloudUser.email}><LogOut className="size-4" />로그아웃</Button>
+          </>
+        ) : (
+          <Button variant="secondary" onClick={onCloudSignIn}><LogIn className="size-4" />Google 로그인</Button>
+        ))}
         <Button variant="secondary" onClick={onSettings}><KeyRound className="size-4" />API 키 설정</Button>
         <Button variant="secondary" onClick={onKnowledge}><FileText className="size-4" />맞춤형 Data 설정 {knowledgeCount > 0 ? `(${knowledgeCount})` : ""}</Button>
         <Button onClick={onNew}><Sparkles className="size-4" />새 작업 시작</Button>
