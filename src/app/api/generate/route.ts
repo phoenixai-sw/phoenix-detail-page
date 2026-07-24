@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { canUseCommonKnowledge } from "@/lib/knowledge-access";
 import { openAIImageSizeForRatio, ratioPromptInstruction } from "@/lib/image-spec";
 import { isRagConfigured, retrieveKnowledge } from "@/lib/rag";
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
   try {
     const form = await request.formData();
     const files = form.getAll("files").filter((file): file is File => file instanceof File);
+    const storagePaths = parseStoragePaths(form.get("storagePaths"));
     const requestText = String(form.get("request") || "");
     const rolloutRequest = String(form.get("rolloutRequest") || "");
     const knowledgeText = String(form.get("knowledgeText") || "").slice(0, 60000);
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     const googleKey = String(form.get("googleKey") || "");
     const apiKey = provider === "google" ? googleKey : openaiKey;
 
-    console.info(`[generate] request provider=${provider} count=${count} startSection=${startSection} files=${files.length} channel=${channel}`);
+    console.info(`[generate] request provider=${provider} count=${count} startSection=${startSection} files=${files.length} storagePaths=${storagePaths.length} channel=${channel}`);
 
     if (!apiKey) {
       return NextResponse.json(
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (files.length === 0) {
+    if (files.length === 0 && storagePaths.length === 0) {
       return NextResponse.json({ error: "기존 상세페이지 이미지 또는 PDF를 업로드해주세요." }, { status: 400 });
     }
 
@@ -79,7 +81,9 @@ export async function POST(request: NextRequest) {
     }
 
     const jobId = randomUUID();
-    const references = await prepareReferenceImages(files);
+    const references = storagePaths.length > 0
+      ? await referencesFromStorage(storagePaths)
+      : await prepareReferenceImages(files);
     console.info(`[generate] references prepared job=${jobId} references=${references.length}`);
     if (references.length === 0) {
       return NextResponse.json({ error: "이미지 생성에 사용할 참조 이미지가 없습니다. PDF는 브라우저에서 PNG로 변환한 뒤 전송됩니다." }, { status: 400 });
@@ -454,6 +458,54 @@ function buildSections(
       promptText
     };
   });
+}
+
+const UPLOAD_BUCKET = "uploads";
+const STORAGE_PATH_PATTERN = /^ref\/[0-9a-f-]{36}\/\d{1,2}\.(jpg|jpeg|png|webp)$/i;
+
+function storageAdminClient() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function parseStoragePaths(value: FormDataEntryValue | null): string[] {
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((path): path is string => typeof path === "string" && STORAGE_PATH_PATTERN.test(path))
+      .slice(0, MAX_REFERENCE_IMAGES);
+  } catch {
+    return [];
+  }
+}
+
+async function referencesFromStorage(paths: string[]): Promise<ReferenceImage[]> {
+  const supabase = storageAdminClient();
+  if (!supabase) throw new Error("업로드 저장소가 설정되지 않았습니다. 잠시 후 다시 시도해주세요.");
+
+  const references: ReferenceImage[] = [];
+  for (const path of paths) {
+    const { data, error } = await supabase.storage.from(UPLOAD_BUCKET).download(path);
+    if (error || !data) {
+      throw new Error("업로드한 원본을 저장소에서 불러오지 못했습니다. 다시 업로드해주세요.");
+    }
+    references.push({
+      name: path.split("/").pop() || "upload.jpg",
+      mimeType: data.type || "image/jpeg",
+      buffer: Buffer.from(await data.arrayBuffer())
+    });
+  }
+
+  supabase.storage.from(UPLOAD_BUCKET).remove(paths).then(
+    () => console.info(`[generate] storage cleanup done (${paths.length})`),
+    (error: unknown) => console.warn(`[generate] storage cleanup failed: ${error instanceof Error ? error.message : error}`)
+  );
+
+  return references;
 }
 
 async function prepareReferenceImages(files: File[]): Promise<ReferenceImage[]> {

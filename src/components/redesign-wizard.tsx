@@ -41,6 +41,7 @@ import {
   signInWithGoogle,
   signOutCloud,
   subscribeCloudUser,
+  uploadReferenceFilesToStorage,
   upsertCloudProject
 } from "@/lib/cloud-sync";
 import { cn } from "@/lib/utils";
@@ -442,7 +443,12 @@ export function RedesignWizard() {
             .join("\n\n")
             .slice(0, 60000)
         : "";
-      uploadFiles.forEach((file) => form.append("files", file));
+      const storagePaths = await uploadReferenceFilesToStorage(uploadFiles);
+      if (storagePaths) {
+        form.append("storagePaths", JSON.stringify(storagePaths));
+      } else {
+        uploadFiles.forEach((file) => form.append("files", file));
+      }
       form.append("knowledgeText", knowledgeText);
       form.append("useKnowledge", String(useSharedKnowledge));
       form.append("knowledgeAccessKey", knowledgeAccessKey);
