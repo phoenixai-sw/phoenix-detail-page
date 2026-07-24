@@ -1,13 +1,13 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { canUseCommonKnowledge } from "@/lib/knowledge-access";
+import { openAIImageSizeForRatio, ratioPromptInstruction } from "@/lib/image-spec";
 import { isRagConfigured, retrieveKnowledge } from "@/lib/rag";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
-const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
 const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
 const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
 const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
@@ -536,21 +536,6 @@ function modelMeta(provider: Provider) {
     return { provider: "google" as const, label: "Google Nano Banana 2", id: GOOGLE_NANO_BANANA_2_MODEL };
   }
   return { provider: "openai" as const, label: "OpenAI Image 2.0", id: OPENAI_IMAGE_MODEL };
-}
-
-function openAIImageSizeForRatio(ratio: string) {
-  if (ratio === "1:1") return "1024x1024";
-  return OPENAI_IMAGE_SIZE;
-}
-
-function ratioPromptInstruction(ratio: string) {
-  if (ratio === "1:1") {
-    return "1:1 정사각형 이미지 1장을 생성한다. 썸네일, 카드뉴스, 보조 이미지에 맞게 제품과 핵심 혜택 1개가 중앙에서 빠르게 읽히도록 구성한다.";
-  }
-  if (ratio === "4:5") {
-    return "4:5 세로 피드형 이미지 1장을 생성한다. 광고/SNS 피드 소재에 맞게 제품 이미지와 짧은 카피를 여유 있게 배치하고, 9:16 상세페이지처럼 너무 길게 만들지 않는다.";
-  }
-  return "9:16 세로형 상세페이지 섹션 이미지 1장을 생성한다. 모바일 상세페이지 본문에 맞게 위에서 아래로 읽히는 정보 흐름을 구성한다.";
 }
 
 async function readJsonResponse(response: Response) {

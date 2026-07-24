@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { openAIImageSizeForRatio, ratioEditPromptInstruction } from "@/lib/image-spec";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
-const OPENAI_IMAGE_SIZE = process.env.OPENAI_IMAGE_SIZE || "1024x1536";
 const OPENAI_IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY || "high";
 const OPENAI_IMAGE_FALLBACK_QUALITY = process.env.OPENAI_IMAGE_FALLBACK_QUALITY || "medium";
 const OPENAI_IMAGE_PARTIAL_IMAGES = process.env.OPENAI_IMAGE_PARTIAL_IMAGES || "1";
@@ -128,7 +128,7 @@ function buildEditPrompt({
   requestText: string;
 }) {
   const sectionNumber = Number(String(section.id || "").replace(/\D/g, ""));
-  const ratioInstruction = ratioPromptInstruction(String(project.ratio || "9:16"));
+  const ratioInstruction = ratioEditPromptInstruction(String(project.ratio || "9:16"));
   const modelPlacementRule = sectionNumber % 2 === 1
     ? "MODEL_PLACEMENT_RULE: odd page. If the user asks for a model/person, use at most one model/person and avoid repeating the same position or pose."
     : "MODEL_PLACEMENT_RULE: even page. Do not add a model/person/face/body/hand model. Use product, icons, tables, cards, routine, FAQ, evidence layouts instead.";
@@ -279,21 +279,6 @@ async function readJsonResponse(response: Response) {
   } catch {
     return { error: { message: simplifyProviderTextError(text || response.statusText, response.status) } };
   }
-}
-
-function openAIImageSizeForRatio(ratio: string) {
-  if (ratio === "1:1") return "1024x1024";
-  return OPENAI_IMAGE_SIZE;
-}
-
-function ratioPromptInstruction(ratio: string) {
-  if (ratio === "1:1") {
-    return "RATIO_RULE: keep the edited image as a 1:1 square composition for thumbnails, card news, and supporting product images.";
-  }
-  if (ratio === "4:5") {
-    return "RATIO_RULE: keep the edited image as a 4:5 vertical feed composition for ads and social feed assets, not a long 9:16 detail page.";
-  }
-  return "RATIO_RULE: keep the edited image as a 9:16 vertical detail-page section for mobile commerce detail pages.";
 }
 
 async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number, timeoutMessage: string) {

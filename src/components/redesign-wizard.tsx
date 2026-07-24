@@ -1408,6 +1408,19 @@ async function normalizeImageToRatio(dataUrl: string, ratio: string) {
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, outputWidth, outputHeight);
+
+    // 잘려나갈 면적이 20%를 초과하는 비정상 size/비율 조합이면 크롭 대신 contain(흰 배경 패딩)으로 폴백
+    const croppedFraction = 1 - (sourceWidth * sourceHeight) / (image.naturalWidth * image.naturalHeight);
+    if (croppedFraction > 0.2) {
+      const fitScale = Math.min(outputWidth / image.naturalWidth, outputHeight / image.naturalHeight);
+      const drawWidth = Math.round(image.naturalWidth * fitScale);
+      const drawHeight = Math.round(image.naturalHeight * fitScale);
+      const drawX = Math.round((outputWidth - drawWidth) / 2);
+      const drawY = Math.round((outputHeight - drawHeight) / 2);
+      context.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight, drawX, drawY, drawWidth, drawHeight);
+      return canvasToDataUrl(canvas, "image/jpeg", 0.92);
+    }
+
     context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputWidth, outputHeight);
     return canvasToDataUrl(canvas, "image/jpeg", 0.92);
   } catch {
